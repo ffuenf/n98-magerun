@@ -40,93 +40,104 @@ HELP;
     protected function execute(InputInterface $input, OutputInterface $output)
     {
         $this->detectMagento($output, true);
-        if ($this->initMagento()) {
+        if (!$this->initMagento()) {
+            return;
+        }
 
-            $jobCode = $input->getArgument('job');
-            if (!$jobCode) {
-                $this->writeSection($output, 'Cronjob');
-                $jobCode = $this->askJobCode($output, $this->getJobs());
-            }
+        $jobCode = $input->getArgument('job');
+        if (!$jobCode) {
+            $this->writeSection($output, 'Cronjob');
+            $jobCode = $this->askJobCode($output, $this->getJobs());
+        }
 
-            $jobsRoot = \Mage::getConfig()->getNode('crontab/jobs');
-            $defaultJobsRoot = \Mage::getConfig()->getNode('default/crontab/jobs');
+        $jobsRoot = \Mage::getConfig()->getNode('crontab/jobs');
+        $defaultJobsRoot = \Mage::getConfig()->getNode('default/crontab/jobs');
 
-            $jobConfig = $jobsRoot->{$jobCode};
+        $jobConfig = $jobsRoot->{$jobCode};
+        if (!$jobConfig || !$jobConfig->run) {
+            $jobConfig = $defaultJobsRoot->{$jobCode};
             if (!$jobConfig || !$jobConfig->run) {
-                $jobConfig = $defaultJobsRoot->{$jobCode};
-                if (!$jobConfig || !$jobConfig->run) {
-                    throw new RuntimeException('No job config found!');
-                }
+                throw new RuntimeException('No job config found!');
+            }
+        }
+
+        $runConfig = $jobConfig->run;
+
+        if ($runConfig->model) {
+            if (!preg_match(self::REGEX_RUN_MODEL, (string) $runConfig->model, $run)) {
+                throw new RuntimeException('Invalid model/method definition, expecting "model/class::method".');
+            }
+            $model = \Mage::getModel($run[1]);
+            $callback = array($model, $run[2]);
+            $callableName = vsprintf("%1\$s::%2\$s", $run);
+            if (!$model || !is_callable($callback, false, $callableName)) {
+                throw new RuntimeException(sprintf('Invalid callback: %s', $callableName));
             }
 
-            $runConfig = $jobConfig->run;
+            $output->write('<info>Run </info><comment>' . $callableName . '</comment> ');
 
-            if ($runConfig->model) {
+            \Mage::getConfig()->init()->loadEventObservers('crontab');
+            \Mage::app()->addEventArea('crontab');
 
-                if (!preg_match(self::REGEX_RUN_MODEL, (string) $runConfig->model, $run)) {
-                    throw new RuntimeException('Invalid model/method definition, expecting "model/class::method".');
-                }
-                if (!($model = \Mage::getModel($run[1])) || !method_exists($model, $run[2])) {
-                    throw new RuntimeException(sprintf('Invalid callback: %s::%s does not exist', $run[1], $run[2]));
-                }
-                $callback = array($model, $run[2]);
+            try {
+                $schedule = \Mage::getModel('cron/schedule');
+                $schedule
+                    ->setJobCode($jobCode)
+                    ->setStatus(\Mage_Cron_Model_Schedule::STATUS_RUNNING)
+                    ->setExecutedAt(strftime('%Y-%m-%d %H:%M:%S', time()))
+                    ->save();
 
-                $output->write('<info>Run </info><comment>' . get_class($model) . '::' . $run[2] . '</comment> ');
+                call_user_func_array($callback, array($schedule));
 
-                try {
-                    $schedule = \Mage::getModel('cron/schedule');
-                    $schedule
-                        ->setJobCode($jobCode)
-                        ->setStatus(\Mage_Cron_Model_Schedule::STATUS_RUNNING)
-                        ->setExecutedAt(strftime('%Y-%m-%d %H:%M:%S', time()))
-                        ->save();
-
-                    call_user_func_array($callback, array($schedule));
-
-                    $schedule
-                        ->setStatus(\Mage_Cron_Model_Schedule::STATUS_SUCCESS)
-                        ->setFinishedAt(strftime('%Y-%m-%d %H:%M:%S', time()))
-                        ->save();
-                } catch (Exception $e) {
-                    $schedule
-                        ->setStatus(\Mage_Cron_Model_Schedule::STATUS_ERROR)
-                        ->setMessages($e->getMessage())
-                        ->setFinishedAt(strftime('%Y-%m-%d %H:%M:%S', time()))
-                        ->save();
-                }
-
-                $output->writeln('<info>done</info>');
+                $schedule
+                    ->setStatus(\Mage_Cron_Model_Schedule::STATUS_SUCCESS)
+                    ->setFinishedAt(strftime('%Y-%m-%d %H:%M:%S', time()))
+                    ->save();
+            } catch (Exception $e) {
+                $schedule
+                    ->setStatus(\Mage_Cron_Model_Schedule::STATUS_ERROR)
+                    ->setMessages($e->getMessage())
+                    ->setFinishedAt(strftime('%Y-%m-%d %H:%M:%S', time()))
+                    ->save();
             }
-            if (empty($callback)) {
-                \Mage::throwException(Mage::helper('cron')->__('No callbacks found'));
-            }
+
+            $output->writeln('<info>done</info>');
+        }
+        if (empty($callback)) {
+            \Mage::throwException(Mage::helper('cron')->__('No callbacks found'));
         }
     }
 
     /**
      * @param OutputInterface $output
-     * @param array           $jobs array of array containing "job" keyed string entries of job-codes
+     * @param array $jobs array of array containing "job" keyed string entries of job-codes
      *
      * @return string         job-code
      * @throws InvalidArgumentException when user selects invalid job interactively
      */
     protected function askJobCode(OutputInterface $output, array $jobs)
     {
+        $index = 0;
+        $keyMap = array_keys($jobs);
+        $question = array();
+
         foreach ($jobs as $key => $job) {
-            $question[] = '<comment>[' . ($key + 1) . ']</comment> ' . $job['Job'] . PHP_EOL;
+            $question[] = '<comment>[' . ($index++) . ']</comment> ' . $job['Job'] . PHP_EOL;
         }
         $question[] = '<question>Please select job: </question>' . PHP_EOL;
 
         /** @var $dialogHelper DialogHelper */
-        $dialogHelper = $this->getHelperSet()->get('dialog');
+        $dialogHelper = $this->getHelper('dialog');
         $jobCode = $dialogHelper->askAndValidate(
             $output,
             $question,
-            function($typeInput) use ($jobs) {
-                if (!isset($jobs[$typeInput - 1])) {
+            function ($typeInput) use ($keyMap, $jobs) {
+                $key = $keyMap[$typeInput];
+                if (!isset($jobs[$key])) {
                     throw new InvalidArgumentException('Invalid job');
                 }
-                return $jobs[$typeInput - 1]['Job'];
+
+                return $jobs[$key]['Job'];
             }
         );
 

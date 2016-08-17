@@ -6,10 +6,11 @@ use RuntimeException;
 
 /**
  * Class Exec
+ *
  * @package N98\Util
  */
-class Exec {
-
+class Exec
+{
     /**
      * @var string
      */
@@ -22,18 +23,25 @@ class Exec {
 
     /**
      * @param string $command
-     * @param string $commandOutput
+     * @param string $output
      * @param int $returnCode
      */
-    public static function run($command, &$commandOutput = null, &$returnCode = null) {
+    public static function run($command, &$output = null, &$returnCode = null)
+    {
+        if (!self::allowed()) {
+            $message = sprintf("No PHP exec(), can not execute command '%s'.", $command);
+            throw new RuntimeException($message);
+        }
 
         $command = $command . self::REDIRECT_STDERR_TO_STDOUT;
 
-        exec($command, $commandOutput, $returnCode);
-        $commandOutput = self::parseCommandOutput($commandOutput);
+        exec($command, $outputArray, $returnCode);
+        $output = self::parseCommandOutput($outputArray);
 
         if ($returnCode !== self::CODE_CLEAN_EXIT) {
-            throw new RuntimeException($commandOutput);
+            throw new RuntimeException(sprintf(
+                sprintf("Exit status %d for command %s. Output was: %s", $returnCode, $command, $output)
+            ));
         }
     }
 
@@ -42,17 +50,19 @@ class Exec {
      *
      * @return bool
      */
-    public static function allowed() {
-
+    public static function allowed()
+    {
         return function_exists('exec');
     }
 
     /**
-     * @param $commandOutput
+     * string from array of strings representing one line per entry
+     *
+     * @param array $commandOutput
      * @return string
      */
-    private static function parseCommandOutput($commandOutput) {
-
-        return implode(PHP_EOL, $commandOutput);
+    private static function parseCommandOutput(array $commandOutput)
+    {
+        return implode(PHP_EOL, $commandOutput) . PHP_EOL;
     }
 }

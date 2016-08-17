@@ -39,7 +39,7 @@ The tool partially works with Magento 2 development branch.
 Installation
 ------------
 
-There are two ways to install the tools:
+There are three ways to install the tools:
 
 Download and Install Phar File
 """"""""""""""""""""""""""""""
@@ -48,7 +48,7 @@ Download the latest stable N98-Magerun phar-file from the file-server_:
 
 .. code-block:: sh
 
-   wget http://files.magerun.net/n98-magerun-latest.phar -O n98-magerun.phar
+   wget https://files.magerun.net/n98-magerun.phar
 
 Verify the download by comparing the MD5 checksum with the one on the website:
 
@@ -102,12 +102,31 @@ be useful if you exchange scripts that are making use of magerun with other user
 `n98-magerun.phar`, Some common aliases amongst the user-base are `magerun` or just `mr` even.
 
 
-.. _file-server: http://files.magerun.net/
+.. _file-server: https://files.magerun.net/
 
 Install with Composer
 """""""""""""""""""""
 
 https://github.com/netz98/n98-magerun/wiki/Install-from-source-with-Composer
+
+Install with Homebrew
+"""""""""""""""""""""
+
+First you need to have homebrew installed: http://brew.sh/
+
+Install homebrew-php tap: https://github.com/Homebrew/homebrew-php#installation
+
+Once homebrew and the tap are installed, you can install the tools with it:
+
+.. code-block:: sh
+
+    brew install n98-magerun
+
+You can now use the tools:
+
+.. code-block:: sh
+
+    $ n98-magerun {command}
 
 Update
 ------
@@ -585,7 +604,7 @@ Set Config
 
 .. code-block:: sh
 
-   $ n98-magerun.phar config:set [--scope[="..."]] [--scope-id[="..."]] [--encrypt] path value
+   $ n98-magerun.phar config:set [--scope[="..."]] [--scope-id[="..."]] [--encrypt] [--force] path value
 
 Arguments:
     path        The config path
@@ -595,6 +614,7 @@ Options:
     --scope     The config value's scope (default: "default" | Can be "default", "websites", "stores")
     --scope-id  The config value's scope ID (default: "0")
     --encrypt   Encrypt the config value using local.xml's crypt key
+    --force     Allow creation of non-standard scope-id's for websites and stores
 
 Get Config
 """"""""""
@@ -628,7 +648,7 @@ Delete Config
 
 .. code-block:: sh
 
-   $ n98-magerun.phar config:delete [--scope[="..."]] [--scope-id[="..."]] [--all] path
+   $ n98-magerun.phar config:delete [--scope[="..."]] [--scope-id[="..."]] [--all] [--force] path
 
 Arguments:
     path        The config path
@@ -637,6 +657,7 @@ Options:
     --scope     The config scope (default, websites, stores)
     --scope-id  The config value's scope ID
     --all       Deletes all entries of a path (ignores --scope and --scope-id)
+    --force     Allow deletion of non-standard scope-id's for websites and stores
 
 Config Search
 """""""""""""
@@ -645,7 +666,7 @@ Search system configuration descriptions.
 
  .. code-block:: sh
 
-   $ n98-magerun.phar text
+   $ n98-magerun.phar config:search text
 
 
 List Magento cache status
@@ -795,6 +816,26 @@ Toggles the active status of an backend user. ID can be e-mail or username. The 
 user by username first and if it cannot be found it will attempt to find the user by e-mail. If ID is omitted you
 will be prompted for it.
 
+Lock admin user
+"""""""""""""""""
+.. code-block:: sh
+
+   $ n98-magerun.phar admin:user:lock [username] [lifetime]
+
+Locks an admin user for the number of days specified in `[lifetime]`. If not provided, the lifetime will default to
+31 days.
+
+Lock all admin users
+"""""""""""""""""
+.. code-block:: sh
+
+   $ n98-magerun.phar admin:user:lockdown [lifetime] [--dry-run]
+
+Locks all admin users in the system for the number of days specified in `[lifetime]`. As above, if not provided it will
+default to 31 days.
+
+Use with caution! Use the `--dry-run` option to test first.
+
 Unlock admin user
 """""""""""""""""
 
@@ -802,7 +843,7 @@ Unlock admin user
 
    $ n98-magerun.phar admin:user:unlock [username]
 
-Releases the password lock on an admin (leave blank to unlock all admins)
+Releases the password lock on an admin (leave blank to unlock all admins).
 
 Disable admin notifications
 """""""""""""""""""""""""""
@@ -945,9 +986,10 @@ Compares module version with saved setup version in `core_resource` table and di
 
 .. code-block:: sh
 
-   $ n98-magerun.phar sys:setup:compare-versions [--ignore-data] [--log-junit="..."] [--format[="..."]]
+   $ n98-magerun.phar sys:setup:compare-versions [--ignore-data] [--errors-only] [--log-junit="..."] [--format[="..."]]
 
 * If a filename with `--log-junit` option is set the tool generates an XML file and no output to *stdout*.
+* If status errors are found this will return an exit status of 1 rather than 0, making it perfect for hooking into deployment scripts.
 
 Change Setup Version
 """"""""""""""""""""
@@ -1088,6 +1130,15 @@ Toggle profiler for debugging a store:
 
    $ n98-magerun.phar dev:profiler [--on] [--off] [--global] [store]
 
+Email Template Usage
+""""""""""""""""""""
+
+Display a report of use transactional email templates:
+
+.. code-block:: sh
+
+   $ n98-magerun.phar dev:email-template:usage --format[=FORMAT]
+
 Development Logs
 """"""""""""""""
 
@@ -1178,6 +1229,8 @@ Resolve/Lookup Class Names
 
 Resolves the given type and grouped class name to a class name, useful for debugging rewrites.
 
+If the resolved class doesn't exist, an info message will be displayed.
+
 .. code-block:: sh
 
    $ n98-magerun.phar dev:class:lookup <block|model|helper> <name>
@@ -1203,14 +1256,14 @@ Global scope can be set by not permitting store_code parameter:
 
    $ n98-magerun.phar dev:symlinks
 
-Create Module Skel
+Create Module Skeleton
 """"""""""""""""""
 
 Creates an empty module and registers it in current Magento shop:
 
 .. code-block:: sh
 
-   $ n98-magerun.phar dev:module:create [--add-blocks] [--add-helpers] [--add-models] [--add-setup] [--add-all] [--modman] [--add-readme] [--add-composer] [--author-name[="..."]] [--author-email[="..."]] [--description[="..."]] vendorNamespace moduleName [codePool]
+   $ n98-magerun.phar dev:module:create [--add-controllers] [--add-blocks] [--add-helpers] [--add-models] [--add-setup] [--add-all] [--modman] [--add-readme] [--add-composer] [--author-name[="..."]] [--author-email[="..."]] [--description[="..."]] vendorNamespace moduleName [codePool]
 
 Code-Pool defaults to `local`.
 
@@ -1276,7 +1329,7 @@ Rewrite List
 
 Lists all registered class rewrites.
 
-.. code-blocks:: sh
+.. code-block:: sh
 
    $ n98-magerun.phar dev:module:rewrite:list [--format[="..."]]
 
@@ -1347,6 +1400,53 @@ Example:
 
 
 * If a filename with `--log-junit` option is set the tool generates an XML file and no output to *stdout*.
+
+Create dummy Category
+"""""""""""""""""""""
+
+.. code-block:: sh
+
+   $ n98-magerun.phar category:create:dummy
+
+Create dummy categories with all default vanilla magento or your custom values.
+
+**Interactive mode** or via **shell arguments** or mixed.
+
++------------------------------+---------------------------------------------------------------------------------------------+--------------------------------------------------+
+| Arguments                    | Description                                                                                 | Accepted Values                                  |
++------------------------------+---------------------------------------------------------------------------------------------+--------------------------------------------------+
+| `store-id`                   | Id of Store to create categories (default: 1)                                               | only integer                                     |
++------------------------------+---------------------------------------------------------------------------------------------+--------------------------------------------------+
+| `category-number`            | Number of categories to create (default: 1)                                                 | only integer                                     |
++------------------------------+---------------------------------------------------------------------------------------------+--------------------------------------------------+
+| `children-categories-number` | Number of children for each category created (default: 0 - use '-1' for random from 0 to 5) | only integer or -1 for random number from 0 to 5 |
++------------------------------+---------------------------------------------------------------------------------------------+--------------------------------------------------+
+| `category-name-prefix`       | Category Name Prefix (default: 'My Awesome Category')                                       | any                                              |
++------------------------------+---------------------------------------------------------------------------------------------+--------------------------------------------------+
+
+Create dummy Dropdown Attribute Values
+""""""""""""""""""""""""""""""""""""""
+
+.. code-block:: sh
+
+   $ n98-magerun.phar eav:attribute:create-dummy-values
+
+Create dummy attribute values (ONLY FOR DROPDOWN ATTRIBUTE)
+
+**Interactive mode** or via **shell arguments** or mixed.
+
++------------------------------+----------------------------------------------+--------------------------------------------------------------+
+| Arguments                    | Description                                  | Accepted Values                                              |
++------------------------------+----------------------------------------------+--------------------------------------------------------------+
+| `locale`                     | Locale value in ISO standard like en_US      | only string                                                  |
++------------------------------+----------------------------------------------+--------------------------------------------------------------+
+| `attribute-id`               | Attribute ID to add values                   | only integer                                                 |
++------------------------------+----------------------------------------------+--------------------------------------------------------------+
+| `values-type`                | Types of Values to create (default int)      | `int`<br />`string`<br />`color`<br />`size`<br />`designer` |
++------------------------------+----------------------------------------------+--------------------------------------------------------------+
+| `values-number`              | Number of Values to create (default 1)       | only integer                                                 |
++------------------------------+----------------------------------------------+--------------------------------------------------------------+
+
 
 List Extensions
 """""""""""""""

@@ -5,12 +5,12 @@ namespace N98\Magento\Command\System;
 use Exception;
 use InvalidArgumentException;
 use N98\Magento\Command\AbstractMagentoCommand;
+use N98\Util\Console\Helper\Table\Renderer\RendererFactory;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Finder\Finder;
-use N98\Util\Console\Helper\Table\Renderer\RendererFactory;
 
 class InfoCommand extends AbstractMagentoCommand
 {
@@ -23,8 +23,11 @@ class InfoCommand extends AbstractMagentoCommand
     {
         $this
             ->setName('sys:info')
-            ->addArgument('key', InputArgument::OPTIONAL, 'Only output value of named param like "version". Key is case insensitive.')
-            ->setDescription('Prints infos about the current magento system.')
+            ->addArgument(
+                'key',
+                InputArgument::OPTIONAL,
+                'Only output value of named param like "version". Key is case insensitive.'
+            )->setDescription('Prints infos about the current magento system.')
             ->addOption(
                 'format',
                 null,
@@ -162,9 +165,12 @@ class InfoCommand extends AbstractMagentoCommand
                 ->sortByName();
 
             $vendors = iterator_to_array($finder);
-            $vendors = array_map(function($value) use ($codePoolDir) {
+            $vendors = array_map(
+                function ($value) use ($codePoolDir) {
                     return str_replace($codePoolDir, '', $value);
-                }, $vendors);
+                },
+                $vendors
+            );
 
             $this->infos['Vendors (' . $codePool . ')'] = implode(', ', $vendors);
         }

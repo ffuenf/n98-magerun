@@ -2,16 +2,15 @@
 
 namespace N98\Magento\Command\Database;
 
+use N98\Util\Console\Helper\Table\Renderer\RendererFactory;
+use N98\Util\Filesystem;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
-use N98\Util\Console\Helper\Table\Renderer\RendererFactory;
-use N98\Util\Filesystem;
 
 class VariablesCommand extends AbstractShowCommand
 {
-
     /**
      * variable name => recommended size (but this value must be calculated depending on the server size
      * @see https://launchpadlibrarian.net/78745738/tuning-primer.sh convert that to PHP ... ?
@@ -41,7 +40,7 @@ class VariablesCommand extends AbstractShowCommand
         'thread_cache_size'               => '',
         'tmp_table_size'                  => array(
             'desc' => '', // @todo add description everywhere
-            'opt'  => ''  // @todo calculate somehow the optimal values depending on the MySQL server environment
+            'opt'  => '', // @todo calculate somehow the optimal values depending on the MySQL server environment
         ),
     );
 

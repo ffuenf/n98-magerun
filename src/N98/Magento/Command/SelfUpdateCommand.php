@@ -57,11 +57,16 @@ EOT
 
         // check for permissions in local filesystem before start connection process
         if (!is_writable($tempDirectory = dirname($tempFilename))) {
-            throw new FilesystemException('n98-magerun update failed: the "' . $tempDirectory . '" directory used to download the temp file could not be written');
+            throw new FilesystemException(
+                'n98-magerun update failed: the "' . $tempDirectory .
+                '" directory used to download the temp file could not be written'
+            );
         }
 
         if (!is_writable($localFilename)) {
-            throw new FilesystemException('n98-magerun update failed: the "' . $localFilename . '" file could not be written');
+            throw new FilesystemException(
+                'n98-magerun update failed: the "' . $localFilename . '" file could not be written'
+            );
         }
 
         $io = new ConsoleIO($input, $output, $this->getHelperSet());
@@ -70,10 +75,10 @@ EOT
         $loadUnstable = $input->getOption('unstable');
         if ($loadUnstable) {
             $versionTxtUrl = 'https://raw.githubusercontent.com/netz98/n98-magerun/develop/version.txt';
-            $remoteFilename = 'http://files.magerun.net/n98-magerun-dev.phar';
+            $remoteFilename = 'https://files.magerun.net/n98-magerun-dev.phar';
         } else {
             $versionTxtUrl = 'https://raw.githubusercontent.com/netz98/n98-magerun/master/version.txt';
-            $remoteFilename = 'http://files.magerun.net/n98-magerun-latest.phar';
+            $remoteFilename = 'https://files.magerun.net/n98-magerun.phar';
         }
 
         $latest = trim($rfs->getContents('raw.githubusercontent.com', $versionTxtUrl, false));
@@ -103,13 +108,13 @@ EOT
                 if ($loadUnstable) {
                     $changeLogContent = $rfs->getContents(
                         'raw.github.com',
-                        'https://raw.github.com/netz98/n98-magerun/develop/changes.txt',
+                        'https://raw.github.com/netz98/n98-magerun/develop/CHANGELOG.md',
                         false
                     );
                 } else {
                     $changeLogContent = $rfs->getContents(
                         'raw.github.com',
-                        'https://raw.github.com/netz98/n98-magerun/master/changes.txt',
+                        'https://raw.github.com/netz98/n98-magerun/master/CHANGELOG.md',
                         false
                     );
                 }

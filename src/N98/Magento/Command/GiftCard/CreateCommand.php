@@ -3,8 +3,8 @@
 namespace N98\Magento\Command\GiftCard;
 
 use Symfony\Component\Console\Input\InputInterface;
-use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Input\InputOption;
+use Symfony\Component\Console\Output\OutputInterface;
 
 class CreateCommand extends AbstractGiftCardCommand
 {
@@ -17,8 +17,17 @@ class CreateCommand extends AbstractGiftCardCommand
     {
         $this
             ->setName('giftcard:create')
-            ->addArgument('amount', \Symfony\Component\Console\Input\InputArgument::REQUIRED, 'Amount for new gift card')
-            ->addOption('website', null, \Symfony\Component\Console\Input\InputOption::VALUE_OPTIONAL, 'Website ID to attach gift card to')
+            ->addArgument(
+                'amount',
+                \Symfony\Component\Console\Input\InputArgument::REQUIRED,
+                'Amount for new gift card'
+            )
+            ->addOption(
+                'website',
+                null,
+                \Symfony\Component\Console\Input\InputOption::VALUE_OPTIONAL,
+                'Website ID to attach gift card to'
+            )
             ->setDescription('Create a gift card with a specified amount');
     }
 
@@ -40,7 +49,7 @@ class CreateCommand extends AbstractGiftCardCommand
             'website_id'    => $input->getOption('website')
                 ? $input->getOption('website')
                 : \Mage::app()->getStore(true)->getWebsiteId(),
-            'balance'       => $input->getArgument('amount')
+            'balance'       => $input->getArgument('amount'),
         );
         $id = \Mage::getModel('enterprise_giftcardaccount/api')->create($data);
         if (!$id) {

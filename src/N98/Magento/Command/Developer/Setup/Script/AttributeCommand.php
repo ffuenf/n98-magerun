@@ -1,5 +1,5 @@
 <?php
-/*
+/**
  * Ported attribute migration script from:
  *
  * https://github.com/astorm/Pulsestorm/blob/master/magento-create-setup.php
@@ -11,14 +11,13 @@
  *
  * @author Dusan Lukic <ldusan84@gmail.com>
  */
-
 namespace N98\Magento\Command\Developer\Setup\Script;
 
 use Exception;
 use N98\Magento\Command\AbstractMagentoCommand;
+use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
-use Symfony\Component\Console\Input\InputArgument;
 
 class AttributeCommand extends AbstractMagentoCommand
 {
@@ -58,7 +57,6 @@ class AttributeCommand extends AbstractMagentoCommand
             $warnings = $generator->getWarnings();
 
             $output->writeln(implode(PHP_EOL, $warnings) . PHP_EOL . $code);
-
         } catch (Exception $e) {
             $output->writeln('<error>' . $e->getMessage() . '</error>');
         }
@@ -77,5 +75,4 @@ class AttributeCommand extends AbstractMagentoCommand
 
         return $attribute;
     }
-
 }

@@ -3,11 +3,11 @@
 namespace N98\Magento\Command\Database;
 
 use InvalidArgumentException;
+use N98\Util\Exec;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
-use N98\Util\Exec;
 
 class ImportCommand extends AbstractDatabaseCommand
 {
@@ -19,7 +19,12 @@ class ImportCommand extends AbstractDatabaseCommand
             ->addOption('compression', 'c', InputOption::VALUE_REQUIRED, 'The compression of the specified file')
             ->addOption('only-command', null, InputOption::VALUE_NONE, 'Print only mysql command. Do not execute')
             ->addOption('only-if-empty', null, InputOption::VALUE_NONE, 'Imports only if database is empty')
-            ->addOption('optimize', null, InputOption::VALUE_NONE, 'Convert verbose INSERTs to short ones before import (not working with compression)')
+            ->addOption(
+                'optimize',
+                null,
+                InputOption::VALUE_NONE,
+                'Convert verbose INSERTs to short ones before import (not working with compression)'
+            )
             ->addOption('drop', null, InputOption::VALUE_NONE, 'Drop and recreate database before import')
             ->addOption('drop-tables', null, InputOption::VALUE_NONE, 'Drop tables before import')
             ->setDescription('Imports database with mysql cli client according to database defined in local.xml');
@@ -30,7 +35,14 @@ Imports an SQL file with mysql cli client into current configured database.
 You need to have MySQL client tools installed on your system.
 HELP;
         $this->setHelp($help);
+    }
 
+    /**
+     * @return bool
+     */
+    public function isEnabled()
+    {
+        return Exec::allowed();
     }
 
     /**
@@ -83,7 +95,6 @@ HELP;
                 }
                 fwrite($out, $line);
             }
-
         }
 
         fwrite($out, ";\n");
@@ -94,7 +105,6 @@ HELP;
         fclose($out);
 
         return $result;
-
     }
     /**
      * @param InputInterface  $input
@@ -105,6 +115,7 @@ HELP;
     protected function execute(InputInterface $input, OutputInterface $output)
     {
         $this->detectDbSettings($output);
+
         $this->writeSection($output, 'Import MySQL Database');
         $dbHelper = $this->getHelper('database');
 
@@ -156,7 +167,8 @@ HELP;
         }
     }
 
-    public function asText() {
+    public function asText()
+    {
         return parent::asText() . "\n" .
             $this->getCompressionHelp();
     }

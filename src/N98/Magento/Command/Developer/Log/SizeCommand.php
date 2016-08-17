@@ -29,30 +29,31 @@ class SizeCommand extends AbstractLogCommand
     protected function execute(InputInterface $input, OutputInterface $output)
     {
         $this->detectMagento($output);
-        if ($this->initMagento()) {
+        if (!$this->initMagento()) {
+            return;
+        }
 
-            $fileName = $input->getArgument('log_filename');
-            if ($fileName === null) {
-                $path = $this->askLogFile($output);
-            } else {
-                $path = $this->getLogDir() . DIRECTORY_SEPARATOR . $fileName;
+        $fileName = $input->getArgument('log_filename');
+        if ($fileName === null) {
+            $path = $this->askLogFile($output);
+        } else {
+            $path = $this->getLogDir() . DIRECTORY_SEPARATOR . $fileName;
+        }
+
+        if ($this->logfileExists(basename($path))) {
+            $size = @filesize($path);
+
+            if ($size === false) {
+                throw new RuntimeException('Couldn\t detect filesize.');
             }
+        } else {
+            $size = 0;
+        }
 
-            if ($this->logfileExists(basename($path))) {
-                $size = @filesize($path);
-
-                if ($size === false) {
-                    throw new RuntimeException('Couldn\t detect filesize.');
-                }
-            } else {
-                $size = 0;
-            }
-
-            if ($input->getOption('human')) {
-                $output->writeln(\N98\Util\Filesystem::humanFileSize($size));
-            } else {
-                $output->writeln("$size");
-            }
+        if ($input->getOption('human')) {
+            $output->writeln(\N98\Util\Filesystem::humanFileSize($size));
+        } else {
+            $output->writeln("$size");
         }
     }
 }

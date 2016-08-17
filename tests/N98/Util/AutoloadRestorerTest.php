@@ -1,12 +1,14 @@
 <?php
-/*
- * @author Tom Klingenberg <mot@fsfe.org>
+/**
+ * this file is part of magerun
+ *
+ * @author Tom Klingenberg <https://github.com/ktomk>
  */
 
 namespace N98\Util;
 
 /**
- * Class WindowsSystemTest
+ * Class AutoloadRestorerTest
  *
  * @package N98\Util
  */

@@ -3,11 +3,11 @@
 namespace N98\Magento\Command\System\Setup;
 
 use InvalidArgumentException;
+use N98\Util\Console\Helper\Table\Renderer\RendererFactory;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
-use N98\Util\Console\Helper\Table\Renderer\RendererFactory;
 
 /**
  * Class ChangeVersionCommand
@@ -38,27 +38,28 @@ class ChangeVersionCommand extends AbstractSetupCommand
     {
         $this->detectMagento($output, true);
 
-        if ($this->initMagento()) {
+        if (!$this->initMagento()) {
+            return;
+        }
 
-            $moduleVersion  = $input->getArgument('version');
-            $moduleName     = $this->getModule($input);
-            $setupName      = $input->getArgument('setup');
-            $moduleSetups   = $this->getModuleSetupResources($moduleName);
+        $moduleVersion  = $input->getArgument('version');
+        $moduleName     = $this->getModule($input);
+        $setupName      = $input->getArgument('setup');
+        $moduleSetups   = $this->getModuleSetupResources($moduleName);
 
-            if (empty($moduleSetups)) {
-                $output->writeln(sprintf('No setup resources found for module: "%s"', $moduleName));
-                return;
+        if (empty($moduleSetups)) {
+            $output->writeln(sprintf('No setup resources found for module: "%s"', $moduleName));
+            return;
+        }
+
+        if ($setupName === 'all') {
+            foreach ($moduleSetups as $setupCode => $setup) {
+                $this->updateSetupResource($moduleName, $setupCode, $moduleVersion, $output);
             }
-
-            if ($setupName === 'all') {
-                foreach ($moduleSetups as $setupCode => $setup) {
-                    $this->updateSetupResource($moduleName, $setupCode, $moduleVersion, $output);
-                }
-            } elseif (array_key_exists($setupName, $moduleSetups)) {
-                $this->updateSetupResource($moduleName, $setupName, $moduleVersion, $output);
-            } else {
-                throw new InvalidArgumentException(sprintf('Error no setup found with the name: "%s"', $setupName));
-            }
+        } elseif (array_key_exists($setupName, $moduleSetups)) {
+            $this->updateSetupResource($moduleName, $setupName, $moduleVersion, $output);
+        } else {
+            throw new InvalidArgumentException(sprintf('Error no setup found with the name: "%s"', $setupName));
         }
     }
 

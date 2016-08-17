@@ -1,10 +1,9 @@
 <?php
-/*
+/**
  * this file is part of magerun
  *
  * @author Tom Klingenberg <https://github.com/ktomk>
  */
-
 namespace N98\Util;
 
 /**
@@ -112,5 +111,22 @@ class OperatingSystem
     public static function getCwd()
     {
         return getcwd();
+    }
+
+    /**
+     * Retrieve path to php binary
+     *
+     * @return string
+     */
+    public static function getPhpBinary()
+    {
+        // PHP_BINARY (>= php 5.4)
+        if (defined('PHP_BINARY')) {
+            return PHP_BINARY;
+        }
+        if (self::isWindows()) {
+            return 'php';
+        }
+        return '/usr/bin/env php';
     }
 }

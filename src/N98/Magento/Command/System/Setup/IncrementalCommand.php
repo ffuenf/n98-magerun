@@ -5,8 +5,6 @@ namespace N98\Magento\Command\System\Setup;
 use Exception;
 use N98\Magento\Command\AbstractMagentoCommand;
 use ReflectionClass;
-use ReflectionMethod;
-use ReflectionProperty;
 use RuntimeException;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
@@ -39,6 +37,7 @@ class IncrementalCommand extends AbstractMagentoCommand
      * Loaded to avoid grabbing the cached version, and so
      * we still have all our original information when we
      * destroy the real configuration
+     *
      * @var mixed $_secondConfig
      */
     protected $_secondConfig;
@@ -56,12 +55,14 @@ class IncrementalCommand extends AbstractMagentoCommand
             ->setName('sys:setup:incremental')
             ->setDescription('List new setup scripts to run, then runs one script')
             ->addOption('stop-on-error', null, InputOption::VALUE_NONE, 'Stops execution of script on error')
-            ->setHelp('Examines an un-cached configuration tree and determines which ' .
-                'structure and data setup resource scripts need to run, and then runs them.');
+            ->setHelp(
+                'Examines an un-cached configuration tree and determines which ' .
+                'structure and data setup resource scripts need to run, and then runs them.'
+            );
     }
 
     /**
-     * @param InputInterface  $input
+     * @param InputInterface $input
      * @param OutputInterface $output
      *
      * @return int|null|void
@@ -98,8 +99,8 @@ class IncrementalCommand extends AbstractMagentoCommand
      */
     protected function _getAllSetupResourceObjects()
     {
-        $config         = $this->_secondConfig;
-        $resources      = $config->getNode('global/resources')->children();
+        $config = $this->_secondConfig;
+        $resources = $config->getNode('global/resources')->children();
         $setupResources = array();
         foreach ($resources as $name => $resource) {
             if (!$resource->setup) {
@@ -112,6 +113,7 @@ class IncrementalCommand extends AbstractMagentoCommand
 
             $setupResources[$name] = new $className($name);
         }
+
         return $setupResources;
     }
 
@@ -125,7 +127,7 @@ class IncrementalCommand extends AbstractMagentoCommand
 
     /**
      * @param \Mage_Core_Model_Resource_Setup $setupResource
-     * @param array                           $args
+     * @param array $args
      *
      * @return array|mixed
      */
@@ -137,7 +139,7 @@ class IncrementalCommand extends AbstractMagentoCommand
         if ($args[0] == \Mage_Core_Model_Resource_Setup::TYPE_DB_INSTALL) {
             $args[0] = \Mage_Core_Model_Resource_Setup::TYPE_DB_UPGRADE;
             $args[1] = $result[0]['toVersion'];
-            $result  = array_merge(
+            $result = array_merge(
                 $result,
                 $this->_callProtectedMethodFromObject('_getAvailableDbFiles', $setupResource, $args)
             );
@@ -148,7 +150,7 @@ class IncrementalCommand extends AbstractMagentoCommand
 
     /**
      * @param \Mage_Core_Model_Resource_Setup $setupResource
-     * @param array                           $args
+     * @param array $args
      *
      * @return array|mixed
      */
@@ -158,7 +160,7 @@ class IncrementalCommand extends AbstractMagentoCommand
         if ($args[0] == \Mage_Core_Model_Resource_Setup::TYPE_DATA_INSTALL) {
             $args[0] = \Mage_Core_Model_Resource_Setup::TYPE_DATA_UPGRADE;
             $args[1] = $result[0]['toVersion'];
-            $result  = array_merge(
+            $result = array_merge(
                 $result,
                 $this->_callProtectedMethodFromObject('_getAvailableDbFiles', $setupResource, $args)
             );
@@ -168,24 +170,25 @@ class IncrementalCommand extends AbstractMagentoCommand
     }
 
     /**
-     * @param ReflectionMethod $method
-     * @param Object            $object
-     * @param array             $args
+     * @param string $method
+     * @param object $object
+     * @param array $args
      *
      * @return mixed
      */
-    protected function _callProtectedMethodFromObject(ReflectionMethod $method, $object, $args = array())
+    protected function _callProtectedMethodFromObject($method, $object, $args = array())
     {
         $r = new ReflectionClass($object);
-        $m = $r->getMethod('_getAvailableDbFiles');
+        $m = $r->getMethod($method);
         $m->setAccessible(true);
+
         return $m->invokeArgs($object, $args);
     }
 
     /**
      * @param string $property
-     * @param Object $object
-     * @param mixed  $value
+     * @param object $object
+     * @param mixed $value
      */
     protected function _setProtectedPropertyFromObjectToValue($property, $object, $value)
     {
@@ -196,8 +199,8 @@ class IncrementalCommand extends AbstractMagentoCommand
     }
 
     /**
-     * @param ReflectionProperty $property
-     * @param Object              $object
+     * @param string $property
+     * @param object $object
      *
      * @return mixed
      */
@@ -206,6 +209,7 @@ class IncrementalCommand extends AbstractMagentoCommand
         $r = new ReflectionClass($object);
         $p = $r->getProperty($property);
         $p->setAccessible(true);
+
         return $p->getValue($object);
     }
 
@@ -249,11 +253,11 @@ class IncrementalCommand extends AbstractMagentoCommand
     protected function _getAllSetupResourceObjectThatNeedUpdates($setupResources = false)
     {
         $setupResources = $setupResources ? $setupResources : $this->_getAllSetupResourceObjects();
-        $needsUpdate    = array();
+        $needsUpdate = array();
         foreach ($setupResources as $name => $setupResource) {
-            $db_ver      = $this->_getDbVersionFromName($name);
+            $db_ver = $this->_getDbVersionFromName($name);
             $db_data_ver = $this->_getDbDataVersionFromName($name);
-            $config_ver  = $this->_getConfiguredVersionFromResourceObject($setupResource);
+            $config_ver = $this->_getConfiguredVersionFromResourceObject($setupResource);
 
             if (
                 (string) $config_ver == (string) $db_ver && //structure
@@ -298,19 +302,20 @@ class IncrementalCommand extends AbstractMagentoCommand
     {
         $output = $this->_output;
         foreach ($needsUpdate as $name => $setupResource) {
-            $dbVersion     = $this->_getDbVersionFromName($name);
+            $dbVersion = $this->_getDbVersionFromName($name);
             $dbDataVersion = $this->_getDbDataVersionFromName($name);
             $configVersion = $this->_getConfiguredVersionFromResourceObject($setupResource);
 
             $moduleConfig = $this->_getProtectedPropertyFromObject('_moduleConfig', $setupResource);
             $output->writeln(
-                array('+--------------------------------------------------+',
+                array(
+                    '+--------------------------------------------------+',
                     'Resource Name:             ' . $name,
                     'For Module:                ' . $moduleConfig->getName(),
                     'Class:                     ' . get_class($setupResource),
                     'Current Structure Version: ' . $dbVersion,
                     'Current Data Version:      ' . $dbDataVersion,
-                    'Configured Version:        ' . $configVersion
+                    'Configured Version:        ' . $configVersion,
                 )
             );
 
@@ -320,13 +325,17 @@ class IncrementalCommand extends AbstractMagentoCommand
                 (string) $configVersion,
             );
 
-            $args[0] = $dbVersion ? \Mage_Core_Model_Resource_Setup::TYPE_DB_UPGRADE : \Mage_Core_Model_Resource_Setup::TYPE_DB_INSTALL;
+            $args[0] = $dbVersion
+                ? \Mage_Core_Model_Resource_Setup::TYPE_DB_UPGRADE
+                : \Mage_Core_Model_Resource_Setup::TYPE_DB_INSTALL;
             $output->writeln('Structure Files to Run: ');
             $filesStructure = $this->_getAvaiableDbFilesFromResource($setupResource, $args);
             $this->_outputFileArray($filesStructure, $output);
             $output->writeln("");
 
-            $args[0] = $dbVersion ? \Mage_Core_Model_Resource_Setup::TYPE_DATA_UPGRADE : \Mage_Core_Model_Resource_Setup::TYPE_DATA_INSTALL;
+            $args[0] = $dbVersion
+                ? \Mage_Core_Model_Resource_Setup::TYPE_DATA_UPGRADE
+                : \Mage_Core_Model_Resource_Setup::TYPE_DATA_INSTALL;
             $output->writeln('Data Files to Run: ');
             $filesData = $this->_getAvaiableDataFilesFromResource($setupResource, $args);
             $this->_outputFileArray($filesData, $output);
@@ -343,6 +352,7 @@ class IncrementalCommand extends AbstractMagentoCommand
         $output = $this->_output;
         if (count($files) == 0) {
             $output->writeln('No files found');
+
             return;
         }
         foreach ($files as $file) {
@@ -366,7 +376,7 @@ class IncrementalCommand extends AbstractMagentoCommand
      * @todo     Repopulate global config after running?  Non trivial since setNode escapes strings
      *
      * @param string $name
-     * @param array  $needsUpdate
+     * @param array $needsUpdate
      * @param string $type
      *
      * @throws RuntimeException
@@ -381,13 +391,14 @@ class IncrementalCommand extends AbstractMagentoCommand
 
         if (!array_key_Exists($name, $needsUpdate)) {
             $output->writeln('<error>No updates to run for ' . $name . ', skipping </error>');
+
             return;
         }
 
         //remove all other setup resources from configuration
         //(in memory, do not persist this to cache)
         $realConfig = \Mage::getConfig();
-        $resources  = $realConfig->getNode('global/resources');
+        $resources = $realConfig->getNode('global/resources');
         foreach ($resources->children() as $resource) {
             if (!$resource->setup) {
                 continue;
@@ -397,15 +408,17 @@ class IncrementalCommand extends AbstractMagentoCommand
         //recreate our specific node in <global><resources></resource></global>
         //allows for theoretical multiple runs
         $setupResourceConfig = $this->_secondConfig->getNode('global/resources/' . $name);
-        $moduleName          = $setupResourceConfig->setup->module;
-        $className           = $setupResourceConfig->setup->class;
+        $moduleName = $setupResourceConfig->setup->module;
+        $className = $setupResourceConfig->setup->class;
 
         $specificResource = $realConfig->getNode('global/resources/' . $name);
-        $setup            = $specificResource->addChild('setup');
+        $setup = $specificResource->addChild('setup');
         if ($moduleName) {
             $setup->addChild('module', $moduleName);
         } else {
-            $output->writeln('<error>No module node configured for ' . $name . ', possible configuration error </error>');
+            $output->writeln(
+                '<error>No module node configured for ' . $name . ', possible configuration error </error>'
+            );
         }
 
         if ($className) {
@@ -419,8 +432,10 @@ class IncrementalCommand extends AbstractMagentoCommand
                 $this->_stashEventContext();
                 \Mage_Core_Model_Resource_Setup::applyAllUpdates();
                 $this->_restoreEventContext();
-            } else if ($type == self::TYPE_MIGRATION_DATA) {
-                \Mage_Core_Model_Resource_Setup::applyAllDataUpdates();
+            } else {
+                if ($type == self::TYPE_MIGRATION_DATA) {
+                    \Mage_Core_Model_Resource_Setup::applyAllDataUpdates();
+                }
             }
             $exceptionOutput = ob_get_clean();
             $this->_output->writeln($exceptionOutput);
@@ -434,42 +449,39 @@ class IncrementalCommand extends AbstractMagentoCommand
     }
 
     /**
-     * @param Exception                      $e
-     * @param string                          $name
-     * @param string                          $magentoExceptionOutput
+     * @param Exception $e
+     * @param string $name
+     * @param string $magentoExceptionOutput
      */
     protected function _processExceptionDuringUpdate(
         Exception $e,
         $name,
         $magentoExceptionOutput
-    )
-    {
+    ) {
         $output = $this->_output;
-        $output->writeln('<error>Magento encountered an error while running the following ' .
-            'setup resource.</error>');
-        $output->writeln("\n    $name \n");
-
-        $output->writeln("<error>The Good News:</error> You know the error happened, and the database   \n" .
-            "information below will  help you fix this error!");
-        $output->writeln("");
-
-        $output->writeln(
-            "<error>The Bad News:</error> Because Magento/MySQL can't run setup resources \n" .
-            "transactionallyyour database is now in an half upgraded, invalid\n" .
-            "state.  Even if you fix the error, new errors may occur due to \n" .
-            "this half upgraded, invalid state.");
-        $output->writeln("");
-
-        $output->writeln("What to Do: ");
-        $output->writeln("1. Figure out why the error happened, and manually fix your \n   " .
-            "database and/or system so it won't happen again.");
-        $output->writeln("2. Restore your database from backup.");
-        $output->writeln("3. Re-run the scripts.");
-        $output->writeln("");
-
-        $output->writeln("Exception Message:");
-        $output->writeln($e->getMessage());
-        $output->writeln("");
+        $output->writeln(array(
+            "<error>Magento encountered an error while running the following setup resource.</error>",
+            "",
+            "    $name ",
+            "",
+            "<error>The Good News:</error> You know the error happened, and the database",
+            "information below will  help you fix this error!",
+            "",
+            "<error>The Bad News:</error> Because Magento/MySQL can't run setup resources",
+            "transactionally your database is now in an half upgraded, invalid",
+            "state. Even if you fix the error, new errors may occur due to",
+            "this half upgraded, invalid state.",
+            '',
+            "What to Do: ",
+            "1. Figure out why the error happened, and manually fix your",
+            "   database and/or system so it won't happen again.",
+            "2. Restore your database from backup.",
+            "3. Re-run the scripts.",
+            "",
+            "Exception Message:",
+            $e->getMessage(),
+            "",
+        ));
 
         if ($magentoExceptionOutput) {
             $this->getHelper('dialog')->askAndValidate(
@@ -486,7 +498,7 @@ class IncrementalCommand extends AbstractMagentoCommand
      */
     protected function _checkCacheSettings()
     {
-        $output   = $this->_output;
+        $output = $this->_output;
         $allTypes = \Mage::app()->useCache();
         if ($allTypes['config'] !== '1') {
             $output->writeln('<error>ERROR: Config Cache is Disabled</error>');
@@ -496,20 +508,23 @@ class IncrementalCommand extends AbstractMagentoCommand
 
             return false;
         }
+
         return true;
     }
 
     /**
      * @param string $toUpdate
-     * @param array  $needsUpdate
+     * @param array $needsUpdate
      * @param string $type
      */
     protected function _runStructureOrDataScripts($toUpdate, array $needsUpdate, $type)
     {
         $output = $this->_output;
         $output->writeln('The next ' . $type . ' update to run is <info>' . $toUpdate . '</info>');
-        $this->getHelper('dialog')->askAndValidate($output,
-            '<question>Press Enter to Run this update: </question>');
+        $this->getHelper('dialog')->askAndValidate(
+            $output,
+            '<question>Press Enter to Run this update: </question>'
+        );
 
         $start = microtime(true);
         $this->_runNamedSetupResource($toUpdate, $needsUpdate, $type);
@@ -535,8 +550,8 @@ class IncrementalCommand extends AbstractMagentoCommand
 
     protected function _stashEventContext()
     {
-        $app               = \Mage::app();
-        $events            = $this->_getProtectedPropertyFromObject('_events', $app);
+        $app = \Mage::app();
+        $events = $this->_getProtectedPropertyFromObject('_events', $app);
         $this->_eventStash = $events;
         $this->_setProtectedPropertyFromObjectToValue('_events', $app, array());
     }
@@ -560,6 +575,7 @@ class IncrementalCommand extends AbstractMagentoCommand
 
         //load a second, not cached, config.xml tree
         $this->_loadSecondConfig();
+
         return true;
     }
 
@@ -571,10 +587,14 @@ class IncrementalCommand extends AbstractMagentoCommand
         $output = $this->_output;
         $this->writeSection($output, 'Analyzing Setup Resource Classes');
         $setupResources = $this->_getAllSetupResourceObjects();
-        $needsUpdate    = $this->_getAllSetupResourceObjectThatNeedUpdates($setupResources);
+        $needsUpdate = $this->_getAllSetupResourceObjectThatNeedUpdates($setupResources);
 
-        $output->writeln('Found <info>' . count($setupResources) . '</info> configured setup resource(s)</info>');
-        $output->writeln('Found <info>' . count($needsUpdate) . '</info> setup resource(s) which need an update</info>');
+        $output->writeln(
+            'Found <info>' . count($setupResources) . '</info> configured setup resource(s)</info>'
+        );
+        $output->writeln(
+            'Found <info>' . count($needsUpdate) . '</info> setup resource(s) which need an update</info>'
+        );
 
         return $needsUpdate;
     }
@@ -585,8 +605,10 @@ class IncrementalCommand extends AbstractMagentoCommand
     protected function _listDetailedUpdateInformation(array $needsUpdate)
     {
         $output = $this->_output;
-        $this->getHelper('dialog')->askAndValidate($output,
-            '<question>Press Enter to View Update Information: </question>');
+        $this->getHelper('dialog')->askAndValidate(
+            $output,
+            '<question>Press Enter to View Update Information: </question>'
+        );
 
         $this->writeSection($output, 'Detailed Update Information');
         $this->_outputUpdateInformation($needsUpdate, $output);
@@ -602,7 +624,7 @@ class IncrementalCommand extends AbstractMagentoCommand
         $output->writeln('All structure updates run before data updates.');
         $output->writeln('');
 
-        $c     = 1;
+        $c = 1;
         $total = count($needsUpdate);
         foreach ($needsUpdate as $key => $value) {
             $toUpdate = $key;
@@ -613,7 +635,7 @@ class IncrementalCommand extends AbstractMagentoCommand
         }
 
         $this->writeSection($output, "Run Data Updates");
-        $c     = 1;
+        $c = 1;
         $total = count($needsUpdate);
         foreach ($needsUpdate as $key => $value) {
             $toUpdate = $key;

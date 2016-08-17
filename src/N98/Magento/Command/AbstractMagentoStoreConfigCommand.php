@@ -2,12 +2,13 @@
 
 namespace N98\Magento\Command;
 
+use N98\Util\Console\Helper\ParameterHelper;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
-use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Input\StringInput;
 use Symfony\Component\Console\Output\NullOutput;
+use Symfony\Component\Console\Output\OutputInterface;
 
 abstract class AbstractMagentoStoreConfigCommand extends AbstractMagentoCommand
 {
@@ -89,25 +90,22 @@ abstract class AbstractMagentoStoreConfigCommand extends AbstractMagentoCommand
         if ($this->scope == self::SCOPE_STORE_VIEW || $this->scope == self::SCOPE_STORE_VIEW_GLOBAL) {
             $this->addArgument('store', InputArgument::OPTIONAL, 'Store code or ID');
         }
-
     }
 
     /**
      * @param InputInterface $input
      * @param OutputInterface $output
      *
-*@return int|void
+     * @return int|void
      */
     protected function execute(InputInterface $input, OutputInterface $output)
     {
         $this->detectMagento($output);
         if ($this->initMagento()) {
-
             $runOnStoreView = false;
             if ($this->scope == self::SCOPE_STORE_VIEW
                 || ($this->scope == self::SCOPE_STORE_VIEW_GLOBAL && !$input->getOption('global'))
-            )
-            {
+            ) {
                 $runOnStoreView = true;
             }
 
@@ -149,14 +147,86 @@ abstract class AbstractMagentoStoreConfigCommand extends AbstractMagentoCommand
     }
 
     /**
+     * Determine if a developer restriction is in place, and if we're enabling something that will use it
+     * then notify and ask if it needs to be changed from its current value.
+     *
+     * @param  \Mage_Core_Model_Store $store
+     * @param  bool                   $enabled
+     * @return void
+     */
+    protected function detectAskAndSetDeveloperIp(\Mage_Core_Model_Store $store, $enabled)
+    {
+        if (!$enabled) {
+            // No need to notify about developer IP restrictions if we're disabling template hints etc
+            return;
+        }
+
+        /** @var OutputInterface $output */
+        $output = $this->getHelper('io')->getOutput();
+
+        if (!$devRestriction = $store->getConfig('dev/restrict/allow_ips')) {
+            return;
+        }
+
+        $this->askAndSetDeveloperIp($output, $store, $devRestriction);
+    }
+
+    /**
+     * Ask if the developer IP should be changed, and change it if required
+     *
+     * @param  OutputInterface        $output
+     * @param  \Mage_Core_Model_Store $store
+     * @param  string|null            $devRestriction
+     * @return void
+     */
+    protected function askAndSetDeveloperIp(OutputInterface $output, \Mage_Core_Model_Store $store, $devRestriction)
+    {
+        $output->writeln(
+            sprintf(
+                '<comment><info>Please note:</info> developer IP restriction is enabled for <info>%s</info>.',
+                $devRestriction
+            )
+        );
+
+        /** @var $dialog \Symfony\Component\Console\Helper\DialogHelper */
+        $dialog = $this->getHelper('dialog');
+        $newDeveloperIp = $dialog->ask(
+            $output,
+            '<question>Change developer IP? Enter a new IP to change or leave blank</question>: '
+        );
+
+        if (empty($newDeveloperIp)) {
+            return;
+        }
+
+        $this->setDeveloperIp($store, $newDeveloperIp);
+        $output->writeln(sprintf('<comment><info>New developer IP restriction set to %s', $newDeveloperIp));
+    }
+
+    /**
+     * Set the restricted IP for developer access
+     *
+     * @param \Mage_Core_Model_Store $store
+     * @param string                 $newDeveloperIp
+     */
+    protected function setDeveloperIp(\Mage_Core_Model_Store $store, $newDeveloperIp)
+    {
+        \Mage::getModel('core/config')
+            ->saveConfig('dev/restrict/allow_ips', $newDeveloperIp, 'stores', $store->getId());
+    }
+
+    /**
      * @param InputInterface  $input
      * @param OutputInterface $output
      *
      * @return mixed
      */
-    protected function _initStore($input, $output)
+    protected function _initStore(InputInterface $input, OutputInterface $output)
     {
-        return $this->getHelperSet()->get('parameter')->askStore($input, $output, 'store', $this->withAdminStore);
+        /** @var ParameterHelper $parameterHelper */
+        $parameterHelper = $this->getHelper('parameter');
+
+        return $parameterHelper->askStore($input, $output, 'store', $this->withAdminStore);
     }
 
     /**
@@ -165,7 +235,6 @@ abstract class AbstractMagentoStoreConfigCommand extends AbstractMagentoCommand
      */
     protected function _beforeSave(\Mage_Core_Model_Store $store, $disabled)
     {
-
     }
 
     /**
@@ -174,6 +243,5 @@ abstract class AbstractMagentoStoreConfigCommand extends AbstractMagentoCommand
      */
     protected function _afterSave(\Mage_Core_Model_Store $store, $disabled)
     {
-
     }
 }

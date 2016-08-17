@@ -37,7 +37,9 @@ abstract class AbstractConnectCommand extends AbstractMagentoCommand
             }
             if (!is_executable($this->mageScript)) {
                 if (!@chmod($this->mageScript, 0755)) {
-                    throw new RuntimeException('Cannot make "mage" shell script executable. Please chmod the file manually.');
+                    throw new RuntimeException(
+                        'Cannot make "mage" shell script executable. Please chmod the file manually.'
+                    );
                 }
             }
             if (!strstr(shell_exec($this->mageScript . ' list-channels'), 'community')) {
@@ -58,12 +60,14 @@ abstract class AbstractConnectCommand extends AbstractMagentoCommand
     /**
      * @param string $line
      *
-     * @return array
+     * @return string[]
      */
     protected function matchConnectLine($line)
     {
         $matches = array();
-        preg_match('/([a-zA-Z0-9-_]+):\s([0-9.]+)\s([a-z]+)/', $line, $matches);
+        // expected format "Package: Version Stability[,Version Stability][,Version Stability]"
+        $pattern = '/([a-zA-Z0-9-_]+):\s([0-9.]+)\s([a-z]+),?([0-9.]+)?\s?([a-z]+)?,?([0-9.]+)?\s?([a-z]+)?/';
+        preg_match($pattern, $line, $matches);
         return $matches;
     }
 

@@ -3,14 +3,14 @@
 namespace N98\Magento\Command;
 
 use InvalidArgumentException;
-use N98\Magento\Command\AbstractMagentoCommand;
 use N98\Util\BinaryString;
+use N98\Util\Exec;
 use RuntimeException;
 use Symfony\Component\Console\Helper\DialogHelper;
 use Symfony\Component\Console\Input\InputArgument;
+use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Input\StringInput;
-use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 
 class ScriptCommand extends AbstractMagentoCommand
@@ -103,6 +103,14 @@ Example:
 It's possible to define multiple values by passing more than one option.
 HELP;
         $this->setHelp($help);
+    }
+
+    /**
+     * @return bool
+     */
+    public function isEnabled()
+    {
+        return Exec::allowed();
     }
 
     protected function execute(InputInterface $input, OutputInterface $output)
@@ -208,7 +216,7 @@ HELP;
                 }
 
                 /* @var $dialog DialogHelper */
-                $dialog = $this->getHelperSet()->get('dialog');
+                $dialog = $this->getHelper('dialog');
 
                 /**
                  * Check for select "?["
@@ -222,7 +230,6 @@ HELP;
                             $choices
                         );
                         $this->scriptVars[$matches[1]] = $choices[$selectedIndex];
-
                     } else {
                         throw new RuntimeException('Invalid choices');
                     }
@@ -231,7 +238,7 @@ HELP;
                     $this->scriptVars[$matches[1]] = $dialog->askAndValidate(
                         $output,
                         '<info>Please enter a value for <comment>' . $matches[1] . '</comment>:</info> ',
-                        function($value) {
+                        function ($value) {
                             if ($value == '') {
                                 throw new RuntimeException('Please enter a value');
                             }
@@ -289,7 +296,8 @@ HELP;
         if (class_exists('\Mage')) {
             $this->scriptVars['${magento.root}'] = $this->getApplication()->getMagentoRootFolder();
             $this->scriptVars['${magento.version}'] = \Mage::getVersion();
-            $this->scriptVars['${magento.edition}'] = is_callable(array('\Mage', 'getEdition')) ? \Mage::getEdition() : 'Community';
+            $this->scriptVars['${magento.edition}'] = is_callable(array('\Mage', 'getEdition'))
+                ? \Mage::getEdition() : 'Community';
         }
 
         $this->scriptVars['${php.version}']     = substr(phpversion(), 0, strpos(phpversion(), '-'));

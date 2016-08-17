@@ -4,13 +4,15 @@ namespace N98\Magento;
 
 use Composer\Autoload\ClassLoader;
 use Exception;
-use N98\Magento\Command\ConfigurationLoader;
-use N98\Util\ArrayFunctions;
+use Mage;
+use Magento\Mtf\EntryPoint\EntryPoint;
+use N98\Magento\Application\Config;
+use N98\Magento\Application\ConfigurationLoader;
+use N98\Magento\Application\Console\Events;
 use N98\Util\AutoloadRestorer;
-use N98\Util\Console\Helper\TwigHelper;
 use N98\Util\Console\Helper\MagentoHelper;
+use N98\Util\Console\Helper\TwigHelper;
 use N98\Util\OperatingSystem;
-use N98\Util\BinaryString;
 use RuntimeException;
 use Symfony\Component\Console\Application as BaseApplication;
 use Symfony\Component\Console\Command\Command;
@@ -18,15 +20,26 @@ use Symfony\Component\Console\Event\ConsoleEvent;
 use Symfony\Component\Console\Formatter\OutputFormatterStyle;
 use Symfony\Component\Console\Helper\FormatterHelper;
 use Symfony\Component\Console\Input\ArgvInput;
+use Symfony\Component\Console\Input\InputDefinition;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\ConsoleOutput;
-use Symfony\Component\Console\Output\NullOutput;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\EventDispatcher\EventDispatcher;
+use UnexpectedValueException;
 
 class Application extends BaseApplication
 {
+    /**
+     * @var string
+     */
+    const APP_NAME = 'n98-magerun';
+
+    /**
+     * @var string
+     */
+    const APP_VERSION = '1.97.23';
+
     /**
      * @var int
      */
@@ -36,17 +49,6 @@ class Application extends BaseApplication
      * @var int
      */
     const MAGENTO_MAJOR_VERSION_2 = 2;
-
-    /**
-     * @var string
-     */
-
-    const APP_NAME = 'n98-magerun';
-
-    /**
-     * @var string
-     */
-    const APP_VERSION = '1.97.6';
 
     /**
      * @var string
@@ -64,19 +66,15 @@ class Application extends BaseApplication
     protected $autoloader;
 
     /**
-     * @var array
+     * @var Config
      */
-    protected $config = array();
+    protected $config;
 
     /**
+     * @see \N98\Magento\Application::setConfigurationLoader()
      * @var ConfigurationLoader
      */
-    protected $configurationLoader = null;
-
-    /**
-     * @var array
-     */
-    protected $partialConfig = array();
+    private $configurationLoaderInjected;
 
     /**
      * @var string
@@ -119,7 +117,7 @@ class Application extends BaseApplication
     protected $_isInitialized = false;
 
     /**
-     * @var \Symfony\Component\EventDispatcher\EventDispatcher
+     * @var EventDispatcher
      */
     protected $dispatcher;
 
@@ -145,7 +143,7 @@ class Application extends BaseApplication
     }
 
     /**
-     * @return \Symfony\Component\Console\Input\InputDefinition
+     * @return InputDefinition
      */
     protected function getDefaultInputDefinition()
     {
@@ -188,23 +186,10 @@ class Application extends BaseApplication
     }
 
     /**
-     * Get names of sub-folders to be scanned during Magento detection
-     * @return array
-     */
-    public function getDetectSubFolders()
-    {
-        if (isset($this->partialConfig['detect']) && isset($this->partialConfig['detect']['subFolders'])) {
-            return $this->partialConfig['detect']['subFolders'];
-
-        }
-        return array();
-    }
-
-    /**
      * Search for magento root folder
      *
-     * @param InputInterface $input
-     * @param OutputInterface $output
+     * @param InputInterface $input [optional]
+     * @param OutputInterface $output [optional]
      * @return void
      */
     public function detectMagento(InputInterface $input = null, OutputInterface $output = null)
@@ -233,7 +218,7 @@ class Application extends BaseApplication
         $magentoHelper = $this->getHelperSet()->get('magento');
         /* @var $magentoHelper MagentoHelper */
         if (!$this->_directRootDir) {
-            $subFolders = $this->getDetectSubFolders();
+            $subFolders = $this->config->getDetectSubFolders();
         } else {
             $subFolders = array();
         }
@@ -254,17 +239,18 @@ class Application extends BaseApplication
     protected function registerHelpers()
     {
         $helperSet = $this->getHelperSet();
+        $config = $this->config->getConfig();
 
         // Twig
         $twigBaseDirs = array(
-            __DIR__ . '/../../../res/twig'
+            __DIR__ . '/../../../res/twig',
         );
-        if (isset($this->config['twig']['baseDirs']) && is_array($this->config['twig']['baseDirs'])) {
-            $twigBaseDirs = array_merge(array_reverse($this->config['twig']['baseDirs']), $twigBaseDirs);
+        if (isset($config['twig']['baseDirs']) && is_array($config['twig']['baseDirs'])) {
+            $twigBaseDirs = array_merge(array_reverse($config['twig']['baseDirs']), $twigBaseDirs);
         }
         $helperSet->set(new TwigHelper($twigBaseDirs), 'twig');
 
-        foreach ($this->config['helpers'] as $helperName => $helperClass) {
+        foreach ($config['helpers'] as $helperName => $helperClass) {
             if (class_exists($helperClass)) {
                 $helperSet->set(new $helperClass(), $helperName);
             }
@@ -272,29 +258,46 @@ class Application extends BaseApplication
     }
 
     /**
+     * @param InputInterface $input
+     *
+     * @return ArgvInput|InputInterface
+     */
+    protected function checkConfigCommandAlias(InputInterface $input)
+    {
+        trigger_error(__METHOD__ . ' moved, use getConfig()->checkConfigCommandAlias()', E_USER_DEPRECATED);
+
+        return $this->config->checkConfigCommandAlias($input);
+    }
+
+    /**
+     * @param Command $command
+     */
+    protected function registerConfigCommandAlias(Command $command)
+    {
+        trigger_error(__METHOD__ . ' moved, use getConfig()->registerConfigCommandAlias() instead', E_USER_DEPRECATED);
+
+        return $this->config->registerConfigCommandAlias($command);
+    }
+
+    /**
      * Adds autoloader prefixes from user's config
      */
     protected function registerCustomAutoloaders()
     {
-        if (isset($this->config['autoloaders']) && is_array($this->config['autoloaders'])) {
-            foreach ($this->config['autoloaders'] as $prefix => $path) {
-                $this->autoloader->add($prefix, $path);
-            }
-        }
+        trigger_error(__METHOD__ . ' moved, use getConfig()->registerCustomAutoloaders() instead', E_USER_DEPRECATED);
 
-        if (isset($this->config['autoloaders_psr4']) && is_array($this->config['autoloaders_psr4'])) {
-            foreach ($this->config['autoloaders_psr4'] as $prefix => $path) {
-                $this->autoloader->addPsr4($prefix, $path);
-            }
-        }
+        $this->config->registerCustomAutoloaders($this->autoloader);
     }
 
     /**
      * @return bool
      */
-    protected function hasCustomCommands() {
-        return isset($this->config['commands']['customCommands'])
-        && is_array($this->config['commands']['customCommands']);
+    protected function hasCustomCommands()
+    {
+        trigger_error(__METHOD__ . ' moved, use config directly instead', E_USER_DEPRECATED);
+
+        $config = $this->config->getConfig();
+        return isset($config['commands']['customCommands']) && is_array($config['commands']['customCommands']);
     }
 
     /**
@@ -302,25 +305,9 @@ class Application extends BaseApplication
      */
     protected function registerCustomCommands()
     {
-        if (!$this->hasCustomCommands()) {
-            return;
-        }
+        trigger_error(__METHOD__ . ' moved, use getConfig()->registerCustomCommands() instead', E_USER_DEPRECATED);
 
-        foreach ($this->config['commands']['customCommands'] as $commandClass) {
-            if (is_array($commandClass)) { // Support for key => value (name -> class)
-                $resolvedCommandClass = current($commandClass);
-                if ($this->isCommandDisabled($resolvedCommandClass)) {
-                    continue;
-                }
-                $command = new $resolvedCommandClass();
-                $command->setName(key($commandClass));
-            } elseif ($this->isCommandDisabled($commandClass)) {
-                continue;
-            } else {
-                $command = new $commandClass();
-            }
-            $this->add($command);
-        }
+        $this->config->registerCustomCommands($this);
     }
 
     /**
@@ -329,7 +316,10 @@ class Application extends BaseApplication
      */
     protected function isCommandDisabled($class)
     {
-        return in_array($class, $this->config['commands']['disabled']);
+        trigger_error(__METHOD__ . ' moved, use config directly instead', E_USER_DEPRECATED);
+
+        $config = $this->config->getConfig();
+        return in_array($class, $config['commands']['disabled']);
     }
 
     /**
@@ -341,41 +331,11 @@ class Application extends BaseApplication
      */
     public function add(Command $command)
     {
-        $this->registerConfigCommandAlias($command);
+        if ($this->config) {
+            $this->config->registerConfigCommandAlias($command);
+        }
 
         return parent::add($command);
-    }
-
-    /**
-     * @param Command $command
-     */
-    protected function registerConfigCommandAlias(Command $command)
-    {
-        if ($this->hasConfigCommandAliases()) {
-            foreach ($this->config['commands']['aliases'] as $alias) {
-                if (!is_array($alias)) {
-                    continue;
-                }
-
-                $aliasCommandName = key($alias);
-                $commandString = $alias[$aliasCommandName];
-
-                list($originalCommand) = explode(' ', $commandString);
-                if ($command->getName() == $originalCommand) {
-                    $currentCommandAliases = $command->getAliases();
-                    $currentCommandAliases[] = $aliasCommandName;
-                    $command->setAliases($currentCommandAliases);
-                }
-            }
-        }
-    }
-
-    /**
-     * @return bool
-     */
-    private function hasConfigCommandAliases()
-    {
-        return isset($this->config['commands']['aliases']) && is_array($this->config['commands']['aliases']);
     }
 
     /**
@@ -402,7 +362,7 @@ class Application extends BaseApplication
      */
     public function checkVarDir(OutputInterface $output)
     {
-        $tempVarDir = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'magento' . DIRECTORY_SEPARATOR . 'var';
+        $tempVarDir = sys_get_temp_dir() . '/magento/var';
         if (!OutputInterface::VERBOSITY_NORMAL <= $output->getVerbosity() && !is_dir($tempVarDir)) {
             return;
         }
@@ -434,22 +394,28 @@ class Application extends BaseApplication
         $currentVarDir = $configOptions->getVarDir();
 
         if ($currentVarDir == $tempVarDir) {
-            $output->writeln(sprintf('<warning>Fallback folder %s is used in n98-magerun</warning>', $tempVarDir));
-            $output->writeln('');
-            $output->writeln('n98-magerun is using the fallback folder. If there is another folder configured for Magento, this can cause serious problems.');
-            $output->writeln('Please refer to https://github.com/netz98/n98-magerun/wiki/File-system-permissions for more information.');
-            $output->writeln('');
+            $output->writeln(array(
+                sprintf('<warning>Fallback folder %s is used in n98-magerun</warning>', $tempVarDir),
+                '',
+                'n98-magerun is using the fallback folder. If there is another folder configured for Magento, this ' .
+                'can cause serious problems.',
+                'Please refer to https://github.com/netz98/n98-magerun/wiki/File-system-permissions ' .
+                'for more information.',
+                '',
+            ));
         } else {
-            $output->writeln(sprintf('<warning>Folder %s found, but not used in n98-magerun</warning>', $tempVarDir));
-            $output->writeln('');
-            $output->writeln(sprintf('This might cause serious problems. n98-magerun is using the configured var-folder <comment>%s</comment>', $currentVarDir));
-            $output->writeln('Please refer to https://github.com/netz98/n98-magerun/wiki/File-system-permissions for more information.');
-            $output->writeln('');
+            $output->writeln(array(
+                sprintf('<warning>Folder %s found, but not used in n98-magerun</warning>', $tempVarDir),
+                '',
+                "This might cause serious problems. n98-magerun is using the configured var-folder " .
+                "<comment>$currentVarDir</comment>",
+                'Please refer to https://github.com/netz98/n98-magerun/wiki/File-system-permissions ' .
+                'for more information.',
+                '',
+            ));
 
             return false;
         }
-
-
     }
 
     /**
@@ -461,17 +427,18 @@ class Application extends BaseApplication
      */
     public function initMagento($soft = false)
     {
-        if ($this->getMagentoRootFolder() !== null) {
-            if ($this->_magentoMajorVersion == self::MAGENTO_MAJOR_VERSION_2) {
-                $this->_initMagento2();
-            } else {
-                $this->_initMagento1($soft);
-            }
-
-            return true;
+        if ($this->getMagentoRootFolder() === null) {
+            return false;
         }
 
-        return false;
+        $isMagento2 = $this->_magentoMajorVersion === self::MAGENTO_MAJOR_VERSION_2;
+        if ($isMagento2) {
+            $this->_initMagento2();
+        } else {
+            $this->_initMagento1($soft);
+        }
+
+        return true;
     }
 
     /**
@@ -530,17 +497,37 @@ class Application extends BaseApplication
     /**
      * @param ClassLoader $autoloader
      */
-    public function setAutoloader($autoloader)
+    public function setAutoloader(ClassLoader $autoloader)
     {
         $this->autoloader = $autoloader;
     }
 
     /**
-     * @return array
+     * Get config array
+     *
+     * Specify one key per parameter to traverse the config. Then returns null
+     * if the path of the key(s) can not be obtained.
+     *
+     * @param string|int $key ... (optional)
+     *
+     * @return array|null
      */
-    public function getConfig()
+    public function getConfig($key = null)
     {
-        return $this->config;
+        $array = $this->config->getConfig();
+
+        $keys = func_get_args();
+        foreach ($keys as $key) {
+            if (null === $key) {
+                continue;
+            }
+            if (!isset($array[$key])) {
+                return null;
+            }
+            $array = $array[$key];
+        }
+
+        return $array;
     }
 
     /**
@@ -548,7 +535,7 @@ class Application extends BaseApplication
      */
     public function setConfig($config)
     {
-        $this->config = $config;
+        $this->config->setConfig($config);
     }
 
     /**
@@ -570,7 +557,7 @@ class Application extends BaseApplication
     public function doRun(InputInterface $input, OutputInterface $output)
     {
         $event = new Application\Console\Event($this, $input, $output);
-        $this->dispatcher->dispatch('n98-magerun.application.console.run.before', $event);
+        $this->dispatcher->dispatch(Events::RUN_BEFORE, $event);
 
         /**
          * only for compatibility to old versions.
@@ -578,51 +565,18 @@ class Application extends BaseApplication
         $event = new ConsoleEvent(new Command('dummy'), $input, $output);
         $this->dispatcher->dispatch('console.run.before', $event);
 
-        $input = $this->checkConfigCommandAlias($input);
+        $input = $this->config->checkConfigCommandAlias($input);
         if ($output instanceof ConsoleOutput) {
             $this->checkVarDir($output->getErrorOutput());
-        }
-
-        if (OutputInterface::VERBOSITY_DEBUG <= $output->getVerbosity()) {
-            $output->writeln('DEBUG');
         }
 
         return parent::doRun($input, $output);
     }
 
     /**
-     * @param InputInterface $input
+     * @param InputInterface $input [optional]
+     * @param OutputInterface $output [optional]
      *
-     * @return ArgvInput|InputInterface
-     */
-    protected function checkConfigCommandAlias(InputInterface $input)
-    {
-        if ($this->hasConfigCommandAliases()) {
-            foreach ($this->config['commands']['aliases'] as $alias) {
-                if (is_array($alias)) {
-                    $aliasCommandName = key($alias);
-                    if ($input->getFirstArgument() == $aliasCommandName) {
-                        $aliasCommandParams = array_slice(BinaryString::trimExplodeEmpty(' ', $alias[$aliasCommandName]), 1);
-                        if (count($aliasCommandParams) > 0) {
-                            // replace with aliased data
-                            $mergedParams = array_merge(
-                                array_slice($_SERVER['argv'], 0, 2),
-                                $aliasCommandParams,
-                                array_slice($_SERVER['argv'], 2)
-                            );
-                            $input = new ArgvInput($mergedParams);
-                        }
-                    }
-                }
-            }
-            return $input;
-        }
-        return $input;
-    }
-
-    /**
-     * @param InputInterface $input
-     * @param OutputInterface $output
      * @return int
      */
     public function run(InputInterface $input = null, OutputInterface $output = null)
@@ -645,7 +599,7 @@ class Application extends BaseApplication
             $this->init(array(), $input, $output);
         } catch (Exception $e) {
             $output = new ConsoleOutput();
-            $this->renderException($e, $output);
+            $this->renderException($e, $output->getErrorOutput());
         }
 
         $return = parent::run($input, $output);
@@ -659,9 +613,9 @@ class Application extends BaseApplication
     }
 
     /**
-     * @param array $initConfig
-     * @param InputInterface $input
-     * @param OutputInterface $output
+     * @param array $initConfig [optional]
+     * @param InputInterface $input [optional]
+     * @param OutputInterface $output [optional]
      *
      * @return void
      */
@@ -682,23 +636,30 @@ class Application extends BaseApplication
             $input = new ArgvInput();
         }
 
-        if ($output === null) {
-            $output = new NullOutput();
+        if (null === $output) {
+            $output = new ConsoleOutput();
         }
 
-        // initialize config
-        $configLoader        = $this->getConfigurationLoader($initConfig, $output);
-        $loadExternalConfig  = !$this->_checkSkipConfigOption($input);
-        $this->partialConfig = $configLoader->getPartialConfig($loadExternalConfig);
+        if (null !== $this->config) {
+            throw new UnexpectedValueException(sprintf('Config already initialized'));
+        }
+
+        $loadExternalConfig = !$this->_checkSkipConfigOption($input);
+
+        $this->config = $config = new Config($initConfig, $this->isPharMode(), $output);
+        if ($this->configurationLoaderInjected) {
+            $config->setLoader($this->configurationLoaderInjected);
+        }
+        $config->loadPartialConfig($loadExternalConfig);
         $this->detectMagento($input, $output);
+        $configLoader = $config->getLoader();
         $configLoader->loadStageTwo($this->_magentoRootFolder, $loadExternalConfig, $this->_magerunStopFileFolder);
+        $config->load();
 
-        $this->config = $configLoader->toArray();
-
-        if ($this->autoloader) {
-            $this->registerCustomAutoloaders();
+        if ($autoloader = $this->autoloader) {
+            $config->registerCustomAutoloaders($autoloader);
             $this->registerEventSubscribers();
-            $this->registerCustomCommands();
+            $config->registerCustomCommands($this);
         }
 
         $this->registerHelpers();
@@ -707,15 +668,16 @@ class Application extends BaseApplication
     }
 
     /**
-     * @param array $initConfig
-     * @param InputInterface $input
-     * @param OutputInterface $output
+     * @param array $initConfig [optional]
+     * @param InputInterface $input [optional]
+     * @param OutputInterface $output [optional]
      */
     public function reinit($initConfig = array(), InputInterface $input = null, OutputInterface $output = null)
     {
         $this->_isInitialized = false;
         $this->_magentoDetected = false;
         $this->_magentoRootFolder = null;
+        $this->config = null;
         $this->init($initConfig, $input, $output);
     }
 
@@ -724,7 +686,9 @@ class Application extends BaseApplication
      */
     protected function registerEventSubscribers()
     {
-        foreach ($this->config['event']['subscriber'] as $subscriberClass) {
+        $config = $this->config->getConfig();
+        $subscriberClasses = $config['event']['subscriber'];
+        foreach ($subscriberClasses as $subscriberClass) {
             $subscriber = new $subscriberClass();
             $this->dispatcher->addSubscriber($subscriber);
         }
@@ -745,25 +709,51 @@ class Application extends BaseApplication
      */
     protected function _checkRootDirOption(InputInterface $input)
     {
-        $definedRootDir = $input->getParameterOption('--root-dir');
-
-        if (!empty($definedRootDir)) {
-            if ($definedRootDir[0] == '~') {
-                $definedRootDir = OperatingSystem::getHomeDir() . substr($definedRootDir, 1);
-            }
-
-            $folder = realpath($definedRootDir);
-            $this->_directRootDir = true;
-            if (is_dir($folder)) {
-                \chdir($folder);
-
-                return;
-            }
+        $rootDir = $input->getParameterOption('--root-dir');
+        if (is_string($rootDir)) {
+            $this->setRootDir($rootDir);
         }
     }
 
     /**
+     * Set root dir (chdir()) of magento directory
+     *
+     * @param string $path to Magento directory
+     */
+    private function setRootDir($path)
+    {
+        if (isset($path[0]) && '~' === $path[0]) {
+            $path = OperatingSystem::getHomeDir() . substr($path, 1);
+        }
+
+        $folder = realpath($path);
+        $this->_directRootDir = true;
+        if (is_dir($folder)) {
+            chdir($folder);
+        }
+    }
+
+    /**
+     * use require-once inside a function with it's own variable scope w/o any other variables
+     * and $this unbound.
+     *
+     * @param string $path
+     */
+    private function requireOnce($path)
+    {
+        $requireOnce = function () {
+            require_once func_get_arg(0);
+        };
+        if (50400 <= PHP_VERSION_ID) {
+            $requireOnce->bindTo(null);
+        }
+
+        $requireOnce($path);
+    }
+
+    /**
      * @param bool $soft
+     *
      * @return void
      */
     protected function _initMagento1($soft = false)
@@ -782,54 +772,47 @@ class Application extends BaseApplication
             return;
         }
 
-        $initSettings = $this->config['init'];
+        $config = $this->config->getConfig();
+        $initSettings = $config['init'];
 
-        \Mage::app($initSettings['code'], $initSettings['type'], $initSettings['options']);
+        Mage::app($initSettings['code'], $initSettings['type'], $initSettings['options']);
     }
 
     /**
-     * use require-once inside a function with it's own variable scope w/o any other variables
-     * and $this unbound.
-     *
-     * @param string $path
-     */
-    private function requireOnce($path)
-    {
-        $requireOnce = function() {
-            require_once  func_get_arg(0);
-        };
-        if (50400 <= PHP_VERSION_ID) {
-            $requireOnce->bindTo(null);
-        }
-
-        $requireOnce($path);
-    }
-
-    /**
-     * show compatibility notice about Magento 2
+     * @return void
      */
     protected function _initMagento2()
     {
-        $magento2Hint = <<<'MAGENTO2HINT'
-You are running a Magento 2 instance. This version of n98-magerun is not compatible
-with Magento 2. Please use n98-magerun2 for this shop.
+        $this->outputMagerunCompatibilityNotice('2');
+    }
+
+    /**
+     * Show a hint that this is Magento incompatible with Magerun and how to obtain the correct Magerun for it
+     *
+     * @param string $version of Magento, "1" or "2", that is incompatible
+     */
+    private function outputMagerunCompatibilityNotice($version)
+    {
+        $file = $version === '2' ? $version : '';
+        $magentoHint = <<<MAGENTOHINT
+You are running a Magento $version.x instance. This version of n98-magerun is not compatible
+with Magento $version.x. Please use n98-magerun$version (version $version) for this shop.
 
 A current version of the software can be downloaded on github.
 
 <info>Download with curl
 ------------------</info>
 
-    <comment>curl -sS http://files.magerun.net/n98-magerun2-latest.phar -o n98-magerun2.phar</comment>
+    <comment>curl -O https://files.magerun.net/n98-magerun$file.phar</comment>
 
 <info>Download with wget
 ------------------</info>
 
-    <comment>wget http://files.magerun.net/n98-magerun2-latest.phar -O n98-magerun2.phar</comment>
+    <comment>wget https://files.magerun.net/n98-magerun$file.phar</comment>
 
-MAGENTO2HINT;
+MAGENTOHINT;
 
         $output = new ConsoleOutput();
-
 
         /** @var $formatter FormatterHelper */
         $formatter = $this->getHelperSet()->get('formatter');
@@ -837,16 +820,15 @@ MAGENTO2HINT;
         $output->writeln(array(
             '',
             $formatter->formatBlock('Compatibility Notice', 'bg=blue;fg=white', true),
-            ''
+            '',
+            $magentoHint,
         ));
 
-        $output->writeln($magento2Hint);
-
-        throw new RuntimeException('This version of n98-magerun is not compatible with Magento 2');
+        throw new RuntimeException('This version of n98-magerun is not compatible with Magento ' . $version);
     }
 
     /**
-     * @return \Symfony\Component\EventDispatcher\EventDispatcher
+     * @return EventDispatcher
      */
     public function getDispatcher()
     {
@@ -858,17 +840,19 @@ MAGENTO2HINT;
      * @param OutputInterface $output
      * @return ConfigurationLoader
      */
-    public function getConfigurationLoader(array $initConfig = array(), OutputInterface $output)
+    public function getConfigurationLoader(array $initConfig, OutputInterface $output)
     {
-        if ($this->configurationLoader === null) {
-            $this->configurationLoader = new ConfigurationLoader(
-                ArrayFunctions::mergeArrays($this->config, $initConfig),
-                $this->isPharMode(),
-                $output
-            );
+        trigger_error(__METHOD__ . ' moved, use getConfig()->getLoader()', E_USER_DEPRECATED);
+
+        unset($initConfig, $output);
+
+        $loader = $this->config ? $this->config->getLoader() : $this->configurationLoaderInjected;
+
+        if (!$loader) {
+            throw new RuntimeException('ConfigurationLoader is not yet available, initialize it or Config first');
         }
 
-        return $this->configurationLoader;
+        return $loader;
     }
 
     /**
@@ -876,9 +860,15 @@ MAGENTO2HINT;
      *
      * @return $this
      */
-    public function setConfigurationLoader($configurationLoader)
+    public function setConfigurationLoader(ConfigurationLoader $configurationLoader)
     {
-        $this->configurationLoader = $configurationLoader;
+        if ($this->config) {
+            $this->config->setLoader($configurationLoader);
+        } else {
+            /* inject loader to be used later when config is created in */
+            /* @see N98\Magento\Application::init */
+            $this->configurationLoaderInjected = $configurationLoader;
+        }
 
         return $this;
     }

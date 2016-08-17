@@ -8,6 +8,15 @@ use N98\Magento\Command\AbstractMagentoCommand;
 abstract class AbstractConfigCommand extends AbstractMagentoCommand
 {
     /**
+     * @var array strings of configuration scopes
+     */
+    protected $_scopes = array(
+        'default',
+        'websites',
+        'stores',
+    );
+
+    /**
      * @return \Mage_Core_Model_Encryption
      */
     protected function getEncryptionModel()
@@ -36,7 +45,7 @@ abstract class AbstractConfigCommand extends AbstractMagentoCommand
     {
         if ($encryptionType == 'encrypt') {
             $value = $this->getEncryptionModel()->encrypt($value);
-        } else if ($encryptionType == 'decrypt') {
+        } elseif ($encryptionType == 'decrypt') {
             $value = $this->getEncryptionModel()->decrypt($value);
         }
 
@@ -45,28 +54,45 @@ abstract class AbstractConfigCommand extends AbstractMagentoCommand
 
     /**
      * @param string $scope
+     *
+     * @return string
      */
     protected function _validateScopeParam($scope)
     {
         if (!in_array($scope, $this->_scopes)) {
             throw new InvalidArgumentException(
-                'Invalid scope parameter. It must be one of ' . implode(',', $this->_scopes)
+                sprintf('Invalid scope parameter, must be one of: %s.', implode(', ', $this->_scopes))
             );
         }
+
+        return $scope;
     }
 
     /**
      * @param string $scope
      * @param string $scopeId
+     * @param boolean $allowZeroScope
      *
-     * @return string
+     * @return string non-negative integer number
      */
-    protected function _convertScopeIdParam($scope, $scopeId)
+    protected function _convertScopeIdParam($scope, $scopeId, $allowZeroScope = false)
     {
+        if ($scope === 'default') {
+            if ("$scopeId" !== "0") {
+                throw new InvalidArgumentException(
+                    sprintf("Invalid scope ID %d in scope '%s', must be 0", $scopeId, $scope)
+                );
+            }
+
+            return $scopeId;
+        }
+
         if ($scope == 'websites' && !is_numeric($scopeId)) {
             $website = \Mage::app()->getWebsite($scopeId);
             if (!$website) {
-                throw new InvalidArgumentException('Invalid scope parameter. Website does not exist.');
+                throw new InvalidArgumentException(
+                    sprintf("Invalid scope parameter, website '%s' does not exist.", $scopeId)
+                );
             }
 
             return $website->getId();
@@ -75,13 +101,43 @@ abstract class AbstractConfigCommand extends AbstractMagentoCommand
         if ($scope == 'stores' && !is_numeric($scopeId)) {
             $store = \Mage::app()->getStore($scopeId);
             if (!$store) {
-                throw new InvalidArgumentException('Invalid scope parameter. Store does not exist.');
+                throw new InvalidArgumentException(
+                    sprintf("Invalid scope parameter. store '%s' does not exist.", $scopeId)
+                );
             }
 
             return $store->getId();
         }
 
+        $this->invalidScopeId(
+            $scopeId !== (string) (int) $scopeId,
+            "Invalid scope parameter, %s is not an integer value",
+            $scopeId
+        );
+
+        $this->invalidScopeId(
+            0 - (bool) $allowZeroScope >= (int) $scopeId,
+            "Invalid scope parameter, %s is not a positive integer value",
+            $scopeId
+        );
+
         return $scopeId;
+    }
+
+    /**
+     * @param boolean $condition
+     * @param string $mask
+     * @param string $scopeId
+     */
+    private function invalidScopeId($condition, $mask, $scopeId)
+    {
+        if (!$condition) {
+            return;
+        }
+
+        throw new InvalidArgumentException(
+            sprintf($mask, var_export($scopeId, true))
+        );
     }
 
     /**

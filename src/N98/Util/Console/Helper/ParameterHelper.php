@@ -4,17 +4,19 @@ namespace N98\Util\Console\Helper;
 
 use Exception;
 use InvalidArgumentException;
+use Mage_Core_Model_Website;
 use N98\Util\Validator\FakeMetadataFactory;
 use RuntimeException;
+use Symfony\Component\Console\Helper\DialogHelper;
 use Symfony\Component\Console\Helper\Helper as AbstractHelper;
-use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Input\InputInterface;
-use Symfony\Component\Console\Output\Output;
+use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Translation\Translator;
-use Symfony\Component\Validator\Constraint;
-use Symfony\Component\Validator\Validator;
 use Symfony\Component\Validator\Constraints;
 use Symfony\Component\Validator\ConstraintValidatorFactory;
+use Symfony\Component\Validator\ConstraintViolationInterface;
+use Symfony\Component\Validator\ConstraintViolationListInterface;
+use Symfony\Component\Validator\Validator;
 
 /**
  * Helper to init some parameters
@@ -24,7 +26,7 @@ class ParameterHelper extends AbstractHelper
     /**
      * @var Validator
      */
-    protected $validator;
+    private $validator;
 
     /**
      * Returns the canonical name of this helper.
@@ -39,47 +41,68 @@ class ParameterHelper extends AbstractHelper
     }
 
     /**
-     * @param InputInterface  $input
+     * @param InputInterface $input
      * @param OutputInterface $output
-     * @param string          $argumentName
-     * @param bool            $withDefaultStore [optional]
+     * @param string $argumentName
+     * @param bool $withDefaultStore [optional]
      *
      * @return mixed
      *
      * @throws InvalidArgumentException
      */
-    public function askStore(InputInterface $input, OutputInterface $output, $argumentName = 'store', $withDefaultStore = false)
-    {
+    public function askStore(
+        InputInterface $input,
+        OutputInterface $output,
+        $argumentName = 'store',
+        $withDefaultStore = false
+    ) {
+        /* @var $storeManager \Mage_Core_Model_App */
+        $storeManager = \Mage::app();
+
         try {
             if ($input->getArgument($argumentName) === null) {
                 throw new RuntimeException('No store given');
             }
             /** @var $store \Mage_Core_Model_Store */
-            $store = \Mage::app()->getStore($input->getArgument($argumentName));
+            $store = $storeManager->getStore($input->getArgument($argumentName));
         } catch (Exception $e) {
+            if (!$input->isInteractive()) {
+                throw new RuntimeException(sprintf('Require %s parameter', $argumentName));
+            }
+
             $stores = array();
+            $question = array();
             $i = 0;
-            foreach (\Mage::app()->getStores($withDefaultStore) as $store) {
+
+            foreach ($storeManager->getStores($withDefaultStore) as $store) {
                 $stores[$i] = $store->getId();
-                $question[] = '<comment>[' . ($i + 1) . ']</comment> ' . $store->getCode() . ' - ' . $store->getName() . PHP_EOL;
-                $i++;
+                $question[] = sprintf(
+                    '<comment>[%d]</comment> %s - %s' . PHP_EOL,
+                    ++$i,
+                    $store->getCode(),
+                    $store->getName()
+                );
             }
 
             if (count($stores) > 1) {
                 $question[] = '<question>Please select a store: </question>';
-                $storeId = $this->getHelperSet()->get('dialog')->askAndValidate($output, $question, function($typeInput) use ($stores) {
-                    if (!isset($stores[$typeInput - 1])) {
-                        throw new InvalidArgumentException('Invalid store');
-                    }
+                $storeId = $this->askAndValidate(
+                    $output,
+                    $question,
+                    function ($typeInput) use ($stores) {
+                        if (!isset($stores[$typeInput - 1])) {
+                            throw new InvalidArgumentException('Invalid store');
+                        }
 
-                    return $stores[$typeInput - 1];
-                });
+                        return $stores[$typeInput - 1];
+                    }
+                );
             } else {
                 // only one store view available -> take it
                 $storeId = $stores[0];
             }
 
-            $store = \Mage::app()->getStore($storeId);
+            $store = $storeManager->getStore($storeId);
         }
 
         return $store;
@@ -95,43 +118,69 @@ class ParameterHelper extends AbstractHelper
      */
     public function askWebsite(InputInterface $input, OutputInterface $output, $argumentName = 'website')
     {
-        try {
-            if ($input->getArgument($argumentName) === null) {
-                throw new RuntimeException('No website given');
-            }
-            /** @var $website \Mage_Core_Model_Website */
-            $website = \Mage::app()->getWebsite($input->getArgument($argumentName));
-        } catch (Exception $e) {
-            $i = 0;
-            $websites = array();
-            foreach (\Mage::app()->getWebsites() as $website) {
-                $websites[$i] = $website->getId();
-                $question[] = '<comment>[' . ($i + 1) . ']</comment> ' . $website->getCode() . ' - ' . $website->getName() . PHP_EOL;
-                $i++;
-            }
-            if (count($websites) == 1) {
-                return \Mage::app()->getWebsite($websites[0]);
-            }
-            $question[] = '<question>Please select a website: </question>';
+        /* @var $storeManager \Mage_Core_Model_App */
+        $storeManager = \Mage::app();
 
-            $websiteId = $this->getHelperSet()->get('dialog')->askAndValidate($output, $question, function($typeInput) use ($websites) {
-                if (!isset($websites[$typeInput - 1])) {
-                    throw new InvalidArgumentException('Invalid store');
-                }
+        $website = null;
+        $argumentValue = $input->getArgument($argumentName);
+        $hasArgument = $argumentValue !== null;
 
-                return $websites[$typeInput - 1];
-            });
-
-            $website = \Mage::app()->getWebsite($websiteId);
+        if ($hasArgument) {
+            try {
+                /* @var $website Mage_Core_Model_Website */
+                $website = $storeManager->getWebsite($argumentValue);
+                return $website;
+            } catch (Exception $e) {
+                // catch all exceptions
+            }
         }
+
+        list($websites, $question) = $this->websitesQuestion($storeManager);
+        if (count($websites) === 1) {
+            return $storeManager->getWebsite($websites[0]);
+        }
+
+        $question[] = '<question>Please select a website: </question>';
+        $callback = function ($typeInput) use ($websites) {
+            if (!isset($websites[$typeInput - 1])) {
+                throw new InvalidArgumentException('Invalid website');
+            }
+
+            return $websites[$typeInput - 1];
+        };
+
+        $websiteId = $this->askAndValidate($output, $question, $callback);
+        $website = $storeManager->getWebsite($websiteId);
 
         return $website;
     }
 
     /**
-     * @param InputInterface  $input
+     * @see askWebsite
+     * @return array websites (integers if website IDs, 0-indexed) and question array (strings)
+     */
+    private function websitesQuestion($storeManager)
+    {
+        $i = 0;
+        $websites = array();
+        $question = array();
+        foreach ($storeManager->getWebsites() as $website) {
+            /* @var $website Mage_Core_Model_Website */
+            $value = $website->getId();
+            $label = sprintf('%s - %s', $website->getCode(), $website->getName());
+            $position = $i + 1;
+
+            $websites[$i] = $value;
+            $question[$i] = sprintf('<comment>[%d]</comment> %s' . PHP_EOL, $position, $label);
+        }
+
+        return array($websites, $question);
+    }
+
+    /**
+     * @param InputInterface $input
      * @param OutputInterface $output
-     * @param string          $argumentName
+     * @param string $argumentName
      *
      * @return string
      */
@@ -141,12 +190,12 @@ class ParameterHelper extends AbstractHelper
             array(
                 'email' => array(
                     new Constraints\NotBlank(),
-                    new Constraints\Email()
-                )
+                    new Constraints\Email(),
+                ),
             )
         );
 
-        return $this->_validateArgument($output, $argumentName, $input->getArgument($argumentName), $constraints);
+        return $this->validateArgument($output, $argumentName, $input->getArgument($argumentName), $constraints);
     }
 
     /**
@@ -154,21 +203,21 @@ class ParameterHelper extends AbstractHelper
      * @param OutputInterface $output
      * @param string $argumentName
      *
-*@return string
+     * @param bool $needDigits [optional]
+     * @return string
      */
     public function askPassword(
         InputInterface $input,
         OutputInterface $output,
         $argumentName = 'password',
         $needDigits = true
-    )
-    {
+    ) {
         $validators = array();
 
         if ($needDigits) {
             $regex = array(
                 'pattern' => '/^(?=.*\d)(?=.*[a-zA-Z])/',
-                'message' => 'Password must contain letters and at least one digit'
+                'message' => 'Password must contain letters and at least one digit',
             );
             $validators[] = new Constraints\Regex($regex);
         }
@@ -177,62 +226,97 @@ class ParameterHelper extends AbstractHelper
 
         $constraints = new Constraints\Collection(
             array(
-                'password' => $validators
+                'password' => $validators,
             )
         );
 
-        return $this->_validateArgument($output, $argumentName, $input->getArgument($argumentName), $constraints);
+        return $this->validateArgument($output, $argumentName, $input->getArgument($argumentName), $constraints);
     }
 
     /**
-     * @param OutputInterface                                $output
-     * @param string                                         $name
-     * @param string                                         $value
-     * @param Constraints\Collection|Constraint|Constraint[] $constraints The constraint(s) to validate against.
+     * @param OutputInterface $output
+     * @param string|array $question
+     * @param callable $callback
      *
-     * @return mixed
+     * @return string
      */
-    protected function _validateArgument(OutputInterface $output, $name, $value, $constraints)
+    private function askAndValidate(OutputInterface $output, $question, $callback)
     {
-        $validator = $this->initValidator();
-        $errors    = null;
+        /** @var DialogHelper $dialog */
+        $dialog = $this->getHelperSet()->get('dialog');
 
-        if (!empty($value)) {
-            $errors = $validator->validateValue(array($name => $value), $constraints);
-            if (count($errors) > 0) {
+        return $dialog->askAndValidate($output, $question, $callback);
+    }
+
+    /**
+     * @param OutputInterface $output
+     * @param string $name
+     * @param string $value
+     * @param Constraints\Collection $constraints The constraint(s) to validate against.
+     *
+     * @return string
+     */
+    private function validateArgument(OutputInterface $output, $name, $value, $constraints)
+    {
+        if (strlen($value)) {
+            $errors = $this->validateValue($name, $value, $constraints);
+            if ($errors->count() > 0) {
                 $output->writeln('<error>' . $errors[0]->getMessage() . '</error>');
+            } else {
+                return $value;
             }
         }
 
-        if (count($errors) > 0 || empty($value)) {
-            $question = '<question>' . ucfirst($name) . ': </question>';
-            $value = $this->getHelperSet()->get('dialog')->askAndValidate(
-                $output,
-                $question,
-                function($typeInput) use ($validator, $constraints, $name) {
-                    $errors = $validator->validateValue(array($name => $typeInput), $constraints);
-                    if (count($errors) > 0) {
-                        throw new InvalidArgumentException($errors[0]->getMessage());
-                    }
+        $question = '<question>' . ucfirst($name) . ': </question>';
 
-                    return $typeInput;
+        $value = $this->askAndValidate(
+            $output,
+            $question,
+            function ($inputValue) use ($constraints, $name) {
+                $errors = $this->validateValue($name, $inputValue, $constraints);
+                if ($errors->count() > 0) {
+                    throw new InvalidArgumentException($errors[0]->getMessage());
                 }
-            );
-            return $value;
-        }
+
+                return $inputValue;
+            }
+        );
+
         return $value;
+    }
+
+    /**
+     * @param string $name
+     * @param string $value
+     * @param Constraints\Collection $constraints The constraint(s) to validate against.
+     *
+     * @return \Symfony\Component\Validator\ConstraintViolationInterface[]|ConstraintViolationListInterface
+     */
+    private function validateValue($name, $value, $constraints)
+    {
+        $validator = $this->getValidator();
+        /** @var ConstraintViolationListInterface|ConstraintViolationInterface[] $errors */
+        $errors = $validator->validateValue(array($name => $value), $constraints);
+
+        return $errors;
     }
 
     /**
      * @return Validator
      */
-    protected function initValidator()
+    private function getValidator()
     {
-        if ($this->validator == null) {
-            $factory = new ConstraintValidatorFactory();
-            $this->validator = new Validator(new FakeMetadataFactory(), $factory, new Translator('en'));
-        }
+        return $this->validator ?: $this->validator = $this->createValidator();
+    }
 
-        return $this->validator;
+    /**
+     * @return Validator
+     */
+    private function createValidator()
+    {
+        $factory = new ConstraintValidatorFactory();
+        $validator = new Validator(new FakeMetadataFactory(), $factory, new Translator('en'));
+
+        return $validator;
     }
 }

@@ -31,11 +31,10 @@ class CreateUserCommand extends AbstractAdminUserCommand
     {
         $this->detectMagento($output, true);
         if ($this->initMagento()) {
-
             $username = $this->getOrAskForArgument('username', $input, $output);
             $email = $this->getOrAskForArgument('email', $input, $output);
             if (($password = $input->getArgument('password')) === null) {
-                $dialog = $this->getHelperSet()->get('dialog');
+                $dialog = $this->getHelper('dialog');
                 $password = $dialog->askHiddenResponse($output, '<question>Password:</question>');
             }
 
@@ -76,7 +75,7 @@ class CreateUserCommand extends AbstractAdminUserCommand
                     'lastname' => $lastname,
                     'email' => $email,
                     'password' => $password,
-                    'is_active' => 1
+                    'is_active' => 1,
                 ))->save();
 
             if ($this->_magentoMajorVersion == self::MAGENTO_MAJOR_VERSION_2) {

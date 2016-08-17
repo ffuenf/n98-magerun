@@ -34,13 +34,19 @@ HELP;
     protected function execute(InputInterface $input, OutputInterface $output)
     {
         $this->detectDbSettings($output);
-        $dialog = $this->getHelperSet()->get('dialog');
+
+        $dialog = $this->getHelper('dialog');
         $dbHelper = $this->getHelper('database');
 
         if ($input->getOption('force')) {
             $shouldDrop = true;
         } else {
-            $shouldDrop = $dialog->askConfirmation($output, '<question>Really drop database ' . $this->dbSettings['dbname'] . ' ?</question> <comment>[n]</comment>: ', false);
+            $shouldDrop = $dialog->askConfirmation(
+                $output,
+                '<question>Really drop database ' . $this->dbSettings['dbname'] .
+                ' ?</question> <comment>[n]</comment>: ',
+                false
+            );
         }
 
         if ($shouldDrop) {

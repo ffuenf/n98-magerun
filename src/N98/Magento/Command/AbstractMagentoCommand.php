@@ -2,18 +2,18 @@
 
 namespace N98\Magento\Command;
 
+use Composer\Factory as ComposerFactory;
+use Composer\IO\ConsoleIO;
+use Composer\Package\Loader\ArrayLoader as PackageLoader;
 use Composer\Package\PackageInterface;
 use InvalidArgumentException;
+use N98\Util\Console\Helper\MagentoHelper;
 use N98\Util\OperatingSystem;
+use N98\Util\StringTyped;
 use RuntimeException;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
-use Symfony\Component\Console\Output\Output;
 use Symfony\Component\Console\Output\OutputInterface;
-use Composer\Package\Loader\ArrayLoader as PackageLoader;
-use Composer\Factory as ComposerFactory;
-use Composer\IO\ConsoleIO;
-use N98\Util\Console\Helper\MagentoHelper;
 
 /**
  * Class AbstractMagentoCommand
@@ -124,12 +124,9 @@ abstract class AbstractMagentoCommand extends Command
             $commandClass = get_class($this);
         }
 
-        $configArray = $this->getApplication()->getConfig();
-        if (isset($configArray['commands'][$commandClass])) {
-            return $configArray['commands'][$commandClass];
-        }
-
-        return null;
+        /** @var \N98\Magento\Application $application */
+        $application = $this->getApplication();
+        return (array) $application->getConfig('commands', $commandClass);
     }
 
     /**
@@ -141,7 +138,7 @@ abstract class AbstractMagentoCommand extends Command
     {
         $output->writeln(array(
             '',
-            $this->getHelperSet()->get('formatter')->formatBlock($text, $style, true),
+            $this->getHelper('formatter')->formatBlock($text, $style, true),
             '',
         ));
     }
@@ -154,9 +151,10 @@ abstract class AbstractMagentoCommand extends Command
      */
     protected function initMagento($soft = false)
     {
-        $init = $this->getApplication()->initMagento($soft);
+        $application = $this->getApplication();
+        $init = $application->initMagento($soft);
         if ($init) {
-            $this->_magentoRootFolder = $this->getApplication()->getMagentoRootFolder();
+            $this->_magentoRootFolder = $application->getMagentoRootFolder();
         }
 
         return $init;
@@ -179,7 +177,9 @@ abstract class AbstractMagentoCommand extends Command
 
         if (!$silent) {
             $editionString = ($this->_magentoEnterprise ? ' (Enterprise Edition) ' : '');
-            $output->writeln('<info>Found Magento ' . $editionString . 'in folder "' . $this->_magentoRootFolder . '"</info>');
+            $output->writeln(
+                '<info>Found Magento ' . $editionString . 'in folder "' . $this->_magentoRootFolder . '"</info>'
+            );
         }
 
         if (!empty($this->_magentoRootFolder)) {
@@ -323,7 +323,13 @@ abstract class AbstractMagentoCommand extends Command
     protected function getComposer(InputInterface $input, OutputInterface $output)
     {
         $io = new ConsoleIO($input, $output, $this->getHelperSet());
-        return ComposerFactory::create($io, array());
+        $config = array(
+            'config' => array(
+                'secure-http' => false,
+            ),
+        );
+
+        return ComposerFactory::create($io, $config);
     }
 
     /**
@@ -345,7 +351,10 @@ abstract class AbstractMagentoCommand extends Command
     protected function checkDeprecatedAliases(InputInterface $input, OutputInterface $output)
     {
         if (isset($this->_deprecatedAlias[$input->getArgument('command')])) {
-            $output->writeln('<error>Deprecated:</error> <comment>' . $this->_deprecatedAlias[$input->getArgument('command')] . '</comment>');
+            $output->writeln(
+                '<error>Deprecated:</error> <comment>' . $this->_deprecatedAlias[$input->getArgument('command')] .
+                '</comment>'
+            );
         }
     }
 
@@ -403,7 +412,7 @@ abstract class AbstractMagentoCommand extends Command
      */
     protected function _parseBoolOption($value)
     {
-        return in_array(strtolower($value), array('y', 'yes', 1, 'true'));
+        return StringTyped::parseBoolOption($value);
     }
 
     /**
@@ -412,11 +421,7 @@ abstract class AbstractMagentoCommand extends Command
      */
     protected function formatActive($value)
     {
-        if (in_array($value, array(1, 'true'))) {
-            return 'active';
-        }
-
-        return 'inactive';
+        return StringTyped::formatActive($value);
     }
 
     /**
@@ -443,7 +448,7 @@ abstract class AbstractMagentoCommand extends Command
          *
          * @return string
          */
-        $validateInstallationFolder = function($folderName) use ($input) {
+        $validateInstallationFolder = function ($folderName) use ($input) {
 
             $folderName = rtrim(trim($folderName, ' '), '/');
             // resolve folder-name to current working directory if relative
@@ -496,12 +501,16 @@ abstract class AbstractMagentoCommand extends Command
             $defaultFolder = './magento';
             $question[] = "<question>Enter installation folder:</question> [<comment>" . $defaultFolder . "</comment>]";
 
-            $installationFolder = $this->getHelper('dialog')->askAndValidate($output, $question, $validateInstallationFolder, false, $defaultFolder);
-
+            $installationFolder = $this->getHelper('dialog')->askAndValidate(
+                $output,
+                $question,
+                $validateInstallationFolder,
+                false,
+                $defaultFolder
+            );
         } else {
             // @Todo improve validation and bring it to 1 single function
             $installationFolder = $validateInstallationFolder($installationFolder);
-
         }
 
         $this->config['installationFolder'] = realpath($installationFolder);
@@ -529,11 +538,10 @@ abstract class AbstractMagentoCommand extends Command
     {
         $inputArgument = $input->getArgument($argument);
         if ($inputArgument === null) {
-
             $message = $this->getArgumentMessage($argument, $message);
 
             /** @var  $dialog  \Symfony\Component\Console\Helper\DialogHelper */
-            $dialog = $this->getHelperSet()->get('dialog');
+            $dialog = $this->getHelper('dialog');
             return $dialog->ask($output, $message);
         }
 
@@ -553,7 +561,7 @@ abstract class AbstractMagentoCommand extends Command
         }
         $dialog .= "<question>{$question}</question> ";
 
-        $selected = $this->getHelper('dialog')->askAndValidate($output, $dialog, function($typeInput) use ($entries) {
+        $selected = $this->getHelper('dialog')->askAndValidate($output, $dialog, function ($typeInput) use ($entries) {
             if (!in_array($typeInput, range(1, count($entries)))) {
                 throw new InvalidArgumentException('Invalid type');
             }

@@ -16,10 +16,12 @@ use Symfony\Component\Console\Output\OutputInterface;
  * - Create a list of product urls only
  *     ./n98-magerun.phar system:urls:list --add-products 4
  *
- * - Create a list of all products, categories and cms pages of store 4 and 5 separating host and path (e.g. to feed a jmeter csv sampler)
+ * - Create a list of all products, categories and cms pages of store 4 and 5 separating host and path (e.g. to feed a
+ *   jmeter csv sampler)
  *     ./n98-magerun.phar system:urls:list --add-all 4,5 '{host},{path}' > urls.csv
  *
- * The "linetemplate" can contain all parts "parse_url" return wrapped in '{}'. '{url}' always maps the complete url and is set by default
+ * The "linetemplate" can contain all parts "parse_url" return wrapped in '{}'. '{url}' always maps the complete url
+ * and is set by default
  *
  * @author Fabrizio Branca
  */
@@ -35,8 +37,7 @@ class ListCommand extends AbstractMagentoCommand
             ->addOption('add-all', null, InputOption::VALUE_NONE, 'Adds categories, products and cms pages')
             ->addArgument('stores', InputArgument::OPTIONAL, 'Stores (comma-separated list of store ids)')
             ->addArgument('linetemplate', InputArgument::OPTIONAL, 'Line template', '{url}')
-            ->setDescription('Get all urls.')
-        ;
+            ->setDescription('Get all urls.');
 
         $help = <<<HELP
 Examples:
@@ -45,11 +46,13 @@ Examples:
 
    $ n98-magerun.phar sys:url:list --add-products 4
 
-- Create a list of all products, categories and cms pages of store 4 and 5 separating host and path (e.g. to feed a jmeter csv sampler):
+- Create a list of all products, categories and cms pages of store 4 
+  and 5 separating host and path (e.g. to feed a jmeter csv sampler):
 
    $ n98-magerun.phar sys:url:list --add-all 4,5 '{host},{path}' > urls.csv
 
-- The "linetemplate" can contain all parts "parse_url" return wrapped in '{}'. '{url}' always maps the complete url and is set by default
+- The "linetemplate" can contain all parts "parse_url" return wrapped 
+  in '{}'. '{url}' always maps the complete url and is set by default
 HELP;
         $this->setHelp($help);
     }
@@ -66,6 +69,10 @@ HELP;
      */
     protected function execute(InputInterface $input, OutputInterface $output)
     {
+        $this->detectMagento($output, true);
+        if (!$this->initMagento()) {
+            return;
+        }
 
         if ($input->getOption('add-all')) {
             $input->setOption('add-categories', true);
@@ -73,54 +80,48 @@ HELP;
             $input->setOption('add-cmspages', true);
         }
 
-        $this->detectMagento($output, true);
-        if ($this->initMagento()) {
+        $stores = explode(',', $input->getArgument('stores'));
 
-            $stores = explode(',', $input->getArgument('stores'));
+        $urls = array();
 
-            $urls = array();
+        foreach ($stores as $storeId) {
+            $currentStore = \Mage::app()->getStore($storeId); /* @var $currentStore \Mage_Core_Model_Store */
 
-            foreach ($stores as $storeId) {
+            // base url
+            $urls[] = $currentStore->getBaseUrl(\Mage_Core_Model_Store::URL_TYPE_WEB);
 
-                $currentStore = \Mage::app()->getStore($storeId); /* @var $currentStore \Mage_Core_Model_Store */
+            $linkBaseUrl = $currentStore->getBaseUrl(\Mage_Core_Model_Store::URL_TYPE_LINK);
 
-                // base url
-                $urls[] = $currentStore->getBaseUrl(\Mage_Core_Model_Store::URL_TYPE_WEB);
-
-                $linkBaseUrl = $currentStore->getBaseUrl(\Mage_Core_Model_Store::URL_TYPE_LINK);
-
-                if ($input->getOption('add-categories')) {
-                    $urls = $this->getUrls('sitemap/catalog_category', $linkBaseUrl, $storeId, $urls);
-                }
-
-                if ($input->getOption('add-products')) {
-                    $urls = $this->getUrls('sitemap/catalog_product', $linkBaseUrl, $storeId, $urls);
-                }
-
-                if ($input->getOption('add-cmspages')) {
-                    $urls = $this->getUrls('sitemap/cms_page', $linkBaseUrl, $storeId, $urls);
-                }
+            if ($input->getOption('add-categories')) {
+                $urls = $this->getUrls('sitemap/catalog_category', $linkBaseUrl, $storeId, $urls);
             }
 
-            if (count($urls) === 0) {
-                return;
+            if ($input->getOption('add-products')) {
+                $urls = $this->getUrls('sitemap/catalog_product', $linkBaseUrl, $storeId, $urls);
             }
 
-            foreach ($urls as $url) {
+            if ($input->getOption('add-cmspages')) {
+                $urls = $this->getUrls('sitemap/cms_page', $linkBaseUrl, $storeId, $urls);
+            }
+        }
 
-                // pre-process
-                $line = $input->getArgument('linetemplate');
-                $line = str_replace('{url}', $url, $line);
+        if (count($urls) === 0) {
+            return;
+        }
 
-                $parts = parse_url($url);
-                foreach ($parts as $key => $value) {
-                    $line = str_replace('{' . $key . '}', $value, $line);
-                }
+        foreach ($urls as $url) {
 
-                // ... and output
-                $output->writeln($line);
+            // pre-process
+            $line = $input->getArgument('linetemplate');
+            $line = str_replace('{url}', $url, $line);
+
+            $parts = parse_url($url);
+            foreach ($parts as $key => $value) {
+                $line = str_replace('{' . $key . '}', $value, $line);
             }
 
+            // ... and output
+            $output->writeln($line);
         }
     }
 
@@ -132,7 +133,8 @@ HELP;
      *
      * @return array
      */
-    protected function getUrls($resourceModel, $linkBaseUrl, $storeId, array $urls) {
+    protected function getUrls($resourceModel, $linkBaseUrl, $storeId, array $urls)
+    {
         $collection = \Mage::getResourceModel($resourceModel)->getCollection($storeId);
         if (!$collection) {
             return $urls;

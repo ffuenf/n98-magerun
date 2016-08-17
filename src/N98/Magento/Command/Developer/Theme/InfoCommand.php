@@ -46,20 +46,24 @@ class InfoCommand extends AbstractMagentoCommand
     protected function execute(InputInterface $input, OutputInterface $output)
     {
         $this->detectMagento($output);
-        if ($this->initMagento()) {
-            foreach (\Mage::app()->getWebsites() as $website) {
-                /* @var $website \Mage_Core_Model_Website */
-                foreach ($website->getStores() as $store) {
-                    /* @var $store \Mage_Core_Model_Store */
-                    $this->_displayTable($output, $store);
-                }
+        if (!$this->initMagento()) {
+            return;
+        }
+
+        foreach (\Mage::app()->getWebsites() as $website) {
+            /* @var $website \Mage_Core_Model_Website */
+            foreach ($website->getStores() as $store) {
+                /* @var $store \Mage_Core_Model_Store */
+                $this->_displayTable($output, $store);
             }
         }
     }
 
     protected function _displayTable(OutputInterface $output, \Mage_Core_Model_Store $store)
     {
-        $this->writeSection($output, 'Current design setting on store: ' . $store->getWebsite()->getCode() . '/' . $store->getCode());
+        $this->writeSection(
+            $output, 'Current design setting on store: ' . $store->getWebsite()->getCode() . '/' . $store->getCode()
+        );
         $storeInfoLines = $this->_parse($this->_configNodesWithExceptions, $store, true);
         $storeInfoLines = array_merge($storeInfoLines, $this->_parse($this->_configNodes, $store));
 
@@ -79,11 +83,16 @@ class InfoCommand extends AbstractMagentoCommand
 
         foreach ($nodes as $nodeLabel => $node) {
             $result[] = array(
-                $nodeLabel, (string) \Mage::getConfig()->getNode($node, AbstractMagentoStoreConfigCommand::SCOPE_STORE_VIEW, $store->getCode())
+                $nodeLabel,
+                (string) \Mage::getConfig()->getNode(
+                    $node,
+                    AbstractMagentoStoreConfigCommand::SCOPE_STORE_VIEW,
+                    $store->getCode()
+                ),
             );
             if ($withExceptions) {
                 $result[] = array(
-                    $nodeLabel . ' exceptions', $this->_parseException($node, $store)
+                    $nodeLabel . ' exceptions', $this->_parseException($node, $store),
                 );
             }
         }
@@ -96,7 +105,11 @@ class InfoCommand extends AbstractMagentoCommand
      */
     protected function _parseException($node, \Mage_Core_Model_Store $store)
     {
-        $exception = (string) \Mage::getConfig()->getNode($node . self::THEMES_EXCEPTION, AbstractMagentoStoreConfigCommand::SCOPE_STORE_VIEW, $store->getCode());
+        $exception = (string) \Mage::getConfig()->getNode(
+            $node . self::THEMES_EXCEPTION,
+            AbstractMagentoStoreConfigCommand::SCOPE_STORE_VIEW,
+            $store->getCode()
+        );
 
         if (empty($exception)) {
             return '';

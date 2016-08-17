@@ -31,35 +31,36 @@ EOT
     protected function execute(InputInterface $input, OutputInterface $output)
     {
         $this->detectMagento($output, true);
-        if ($this->initMagento()) {
+        if (!$this->initMagento()) {
+            return;
+        }
 
-            $this->writeSection($output, 'Config Search');
+        $this->writeSection($output, 'Config Search');
 
-            $searchString = $input->getArgument('text');
-            $system = \Mage::getConfig()->loadModulesConfiguration('system.xml');
-            $matches = $this->_searchConfiguration($searchString, $system);
+        $searchString = $input->getArgument('text');
+        $system = \Mage::getConfig()->loadModulesConfiguration('system.xml');
+        $matches = $this->_searchConfiguration($searchString, $system);
 
-            if (count($matches) > 0) {
-                foreach ($matches as $match) {
-                    $output->writeln('Found a <comment>' . $match->type . '</comment> with a match');
-                    $output->writeln('  ' . $this->_getPhpMageStoreConfigPathFromMatch($match));
-                    $output->writeln('  ' . $this->_getPathFromMatch($match));
+        if (count($matches) > 0) {
+            foreach ($matches as $match) {
+                $output->writeln('Found a <comment>' . $match->type . '</comment> with a match');
+                $output->writeln('  ' . $this->_getPhpMageStoreConfigPathFromMatch($match));
+                $output->writeln('  ' . $this->_getPathFromMatch($match));
 
-                    if ($match->match_type == 'comment') {
-                        $output->writeln(
-                            '  ' .
-                            str_ireplace(
-                                $searchString,
-                                '<info>' . $searchString . '</info>',
-                                (string) $match->node->comment
-                            )
-                        );
-                    }
-                    $output->writeln('');
+                if ($match->match_type == 'comment') {
+                    $output->writeln(
+                        '  ' .
+                        str_ireplace(
+                            $searchString,
+                            '<info>' . $searchString . '</info>',
+                            (string) $match->node->comment
+                        )
+                    );
                 }
-            } else {
-                $output->writeln('<info>No matches for <comment>' . $searchString . '</comment></info>');
+                $output->writeln('');
             }
+        } else {
+            $output->writeln('<info>No matches for <comment>' . $searchString . '</comment></info>');
         }
     }
 
@@ -74,7 +75,7 @@ EOT
         $xpathSections = array(
             'sections/*',
             'sections/*/groups/*',
-            'sections/*/groups/*/fields/*'
+            'sections/*/groups/*/fields/*',
         );
 
         $matches = array();
@@ -119,7 +120,6 @@ EOT
         $match = new \stdClass;
         $match->type = $this->_getNodeType($node);
         if (stristr((string) $node->label, $searchString)) {
-
             $match->match_type = 'label';
             $match->node = $node;
 
@@ -159,7 +159,6 @@ EOT
             default:
                 return 'unknown';
         }
-
     }
 
     /**
@@ -229,7 +228,5 @@ EOT
                 // @TODO Why?
                 throw new RuntimeException(__METHOD__);
         }
-
     }
-
 }

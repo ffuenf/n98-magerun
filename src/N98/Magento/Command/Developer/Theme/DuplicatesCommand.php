@@ -2,12 +2,12 @@
 
 namespace N98\Magento\Command\Developer\Theme;
 
-use N98\Magento\Command\AbstractMagentoCommand;
 use N98\JUnitXml\Document as JUnitXmlDocument;
+use N98\Magento\Command\AbstractMagentoCommand;
+use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
-use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Finder\Finder;
 
 class DuplicatesCommand extends AbstractMagentoCommand
@@ -23,7 +23,12 @@ class DuplicatesCommand extends AbstractMagentoCommand
                 'Original theme to comapre. Default is "base/default"',
                 'base/default'
             )
-            ->addOption('log-junit', null, InputOption::VALUE_REQUIRED, 'Log duplicates in JUnit XML format to defined file.')
+            ->addOption(
+                'log-junit',
+                null,
+                InputOption::VALUE_REQUIRED,
+                'Log duplicates in JUnit XML format to defined file.'
+            )
             ->setDescription('Find duplicate files (templates, layout, locale, etc.) between two themes.')
         ;
 
@@ -71,7 +76,6 @@ HELP;
                     $output->writeln($duplicates);
                 }
             }
-
         }
     }
 
@@ -116,7 +120,8 @@ HELP;
 
         $testCase = $suite->addTestCase();
         $testCase->setName(
-            'Magento Duplicate Theme Files: ' . $input->getArgument('theme') . ' | ' . $input->getArgument('originalTheme')
+            'Magento Duplicate Theme Files: ' . $input->getArgument('theme') . ' | ' .
+            $input->getArgument('originalTheme')
         );
         $testCase->setClassname('ConflictsCommand');
         foreach ($duplicates as $duplicate) {

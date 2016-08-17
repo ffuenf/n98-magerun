@@ -3,6 +3,7 @@
 namespace N98\Magento\Command\LocalConfig;
 
 use N98\Magento\Command\AbstractMagentoCommand;
+use Symfony\Component\Console\Helper\DialogHelper;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
@@ -46,7 +47,9 @@ HELP;
         $configFileTemplate = dirname($configFile) . '/local.xml.template';
 
         if (file_exists($configFile)) {
-            $output->writeln(sprintf('<info>local.xml file already exists in folder "%s/app/etc"</info>', dirname($configFile)));
+            $output->writeln(
+                sprintf('<info>local.xml file already exists in folder "%s/app/etc"</info>', dirname($configFile))
+            );
             return;
         }
 
@@ -73,7 +76,8 @@ HELP;
             '{{db_user}}'            => $this->_wrapCData($input->getArgument('db-user')),
             '{{db_pass}}'            => $this->_wrapCData($input->getArgument('db-pass')),
             '{{db_name}}'            => $this->_wrapCData($input->getArgument('db-name')),
-            '{{db_init_statemants}}' => $this->_wrapCData('SET NAMES utf8'), // this is right -> magento has a little typo bug "statemants".
+            // typo intended -> magento has a little typo bug "statemants".
+            '{{db_init_statemants}}' => $this->_wrapCData('SET NAMES utf8'),
             '{{db_model}}'           => $this->_wrapCData('mysql4'),
             '{{db_type}}'            => $this->_wrapCData('pdo_mysql'),
             '{{db_pdo_type}}'        => $this->_wrapCData(''),
@@ -96,7 +100,8 @@ HELP;
      */
     protected function askForArguments(InputInterface $input, OutputInterface $output)
     {
-        $dialog = $this->getHelperSet()->get('dialog');
+        /* @var $dialog DialogHelper */
+        $dialog = $this->getHelper('dialog');
         $dialog->setInput($input);
         $messagePrefix = 'Please enter the ';
 
@@ -110,14 +115,13 @@ HELP;
         );
 
         foreach ($arguments as $argument => $options) {
-
             if (isset($options['default']) && $input->getArgument($argument) === null) {
                 $input->setArgument(
                     $argument,
                     $dialog->ask(
                         $output,
                         sprintf('<question>%s%s:</question>', $messagePrefix, $options['prompt']),
-                        $options['default']
+                        (string) $options['default']
                     )
                 );
             } else {

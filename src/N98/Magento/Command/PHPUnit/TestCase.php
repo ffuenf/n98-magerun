@@ -4,6 +4,7 @@ namespace N98\Magento\Command\PHPUnit;
 
 use N98\Magento\Application;
 use PHPUnit_Framework_MockObject_MockObject;
+use RuntimeException;
 
 /**
  * Class TestCase
@@ -24,6 +25,43 @@ class TestCase extends \PHPUnit_Framework_TestCase
     private $root;
 
     /**
+     * @param string $varname name of the environment variable containing the test-root
+     * @param string $basename name of the stopfile containing the test-root
+     *
+     * @return string|null
+     */
+    public static function getTestMagentoRootFromEnvironment($varname, $basename)
+    {
+        $root = getenv($varname);
+        if (empty($root) && strlen($basename)) {
+            $stopfile = getcwd() . '/' . $basename;
+            if (is_readable($stopfile) && $buffer = rtrim(file_get_contents($stopfile))) {
+                $root = $buffer;
+            }
+        }
+        if (empty($root)) {
+            return;
+        }
+
+        # directory test
+        if (!is_dir($root)) {
+            throw new RuntimeException(
+                sprintf("%s path '%s' is not a directory", $varname, $root)
+            );
+        }
+
+        # resolve root to realpath to be independent to current working directory
+        $rootRealpath = realpath($root);
+        if (false === $rootRealpath) {
+            throw new RuntimeException(
+                sprintf("Failed to resolve %s path '%s' with realpath()", $varname, $root)
+            );
+        }
+
+        return $rootRealpath;
+    }
+
+    /**
      * getter for the magento root directory of the test-suite
      *
      * @see ApplicationTest::testExecute
@@ -36,20 +74,22 @@ class TestCase extends \PHPUnit_Framework_TestCase
             return $this->root;
         }
 
-        $root = getenv('N98_MAGERUN_TEST_MAGENTO_ROOT');
-        if (empty($root)) {
+        $varname = 'N98_MAGERUN_TEST_MAGENTO_ROOT';
+        $basename = '.n98-magerun';
+
+        $root = self::getTestMagentoRootFromEnvironment($varname, $basename);
+
+        if (null === $root) {
             $this->markTestSkipped(
-                'Please specify environment variable N98_MAGERUN_TEST_MAGENTO_ROOT with path to your test ' .
-                'magento installation!'
+                "Please specify environment variable $varname with path to your test magento installation!"
             );
         }
 
-        $this->root = realpath($root);
-        return $this->root;
+        return $this->root = $root;
     }
 
     /**
-     * @return PHPUnit_Framework_MockObject_MockObject|Application
+     * @return Application|PHPUnit_Framework_MockObject_MockObject
      */
     public function getApplication()
     {
@@ -60,7 +100,18 @@ class TestCase extends \PHPUnit_Framework_TestCase
                 'N98\Magento\Application',
                 array('getMagentoRootFolder')
             );
-            $loader = require __DIR__ . '/../../../../../vendor/autoload.php';
+
+            // Get the composer bootstrap
+            if (defined('PHPUNIT_COMPOSER_INSTALL')) {
+                $loader = require PHPUNIT_COMPOSER_INSTALL;
+            } elseif (file_exists(__DIR__ . '/../../../../../../../autoload.php')) {
+                // Installed via composer, already in vendor
+                $loader = require __DIR__ . '/../../../../../../../autoload.php';
+            } else {
+                // Check if testing root package without PHPUnit
+                $loader = require __DIR__ . '/../../../../../vendor/autoload.php';
+            }
+
             $this->application->setAutoloader($loader);
             $this->application->expects($this->any())->method('getMagentoRootFolder')->will($this->returnValue($root));
 
@@ -81,6 +132,8 @@ class TestCase extends \PHPUnit_Framework_TestCase
      */
     public function getDatabaseConnection()
     {
-        return \Mage::getSingleton('core/resource')->getConnection('write');
+        $resource = \Mage::getSingleton('core/resource');
+
+        return $resource->getConnection('write');
     }
 }

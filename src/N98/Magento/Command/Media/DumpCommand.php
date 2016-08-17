@@ -4,8 +4,8 @@ namespace N98\Magento\Command\Media;
 
 use N98\Magento\Command\AbstractMagentoCommand;
 use Symfony\Component\Console\Input\InputArgument;
-use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Input\InputInterface;
+use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Finder\Finder;
 use Symfony\Component\Finder\SplFileInfo;
@@ -60,7 +60,9 @@ class DumpCommand extends AbstractMagentoCommand
             /* @var $file SplFileInfo */
             $currentFolder = pathinfo($file->getRelativePathname(), PATHINFO_DIRNAME);
             if ($currentFolder != $lastFolder) {
-                $output->writeln(sprintf('<info>Compress directory:</info> <comment>media/%s</comment>', $currentFolder));
+                $output->writeln(
+                    sprintf('<info>Compress directory:</info> <comment>media/%s</comment>', $currentFolder)
+                );
             }
             $zip->addFile($file->getPathname(), 'media' . DIRECTORY_SEPARATOR . $file->getRelativePathname());
 

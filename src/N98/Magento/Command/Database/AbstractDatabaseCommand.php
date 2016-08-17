@@ -4,14 +4,17 @@ namespace N98\Magento\Command\Database;
 
 use InvalidArgumentException;
 use N98\Magento\Command\AbstractMagentoCommand;
-use N98\Magento\Command\Database\Compressor;
+use N98\Magento\Command\Database\Compressor\Compressor;
+use N98\Magento\Command\Database\Compressor\Gzip;
+use N98\Magento\Command\Database\Compressor\Uncompressed;
+use N98\Magento\DbSettings;
 use N98\Util\Console\Helper\DatabaseHelper;
 use Symfony\Component\Console\Output\OutputInterface;
 
 abstract class AbstractDatabaseCommand extends AbstractMagentoCommand
 {
     /**
-     * @var array
+     * @var array|DbSettings
      */
     protected $dbSettings;
 
@@ -20,16 +23,14 @@ abstract class AbstractDatabaseCommand extends AbstractMagentoCommand
      */
     protected $isSocketConnect = false;
 
-
     /**
      * @param OutputInterface $output
      */
     protected function detectDbSettings(OutputInterface $output)
     {
-        $database = $this->getHelper('database'); /* @var $database DatabaseHelper */
-        $database->detectDbSettings($output);
-        $this->isSocketConnect = $database->getIsSocketConnect();
-        $this->dbSettings = $database->getDbSettings();
+        /* @var $database DatabaseHelper */
+        $database = $this->getHelper('database');
+        $this->dbSettings = $database->getDbSettings($output);
     }
 
     /**
@@ -37,13 +38,12 @@ abstract class AbstractDatabaseCommand extends AbstractMagentoCommand
      *
      * @return mixed
      */
-    function __get($name)
+    public function __get($name)
     {
         if ($name == '_connection') {
             return $this->getHelper('database')->getConnection();
         }
     }
-
 
     /**
      * Generate help for compression
@@ -64,21 +64,23 @@ abstract class AbstractDatabaseCommand extends AbstractMagentoCommand
 
     /**
      * @param string $type
-     * @return Compressor\AbstractCompressor
+     * @return Compressor
      * @throws InvalidArgumentException
      */
     protected function getCompressor($type)
     {
         switch ($type) {
             case null:
-                return new Compressor\Uncompressed;
+                return new Uncompressed;
 
             case 'gz':
             case 'gzip':
-                return new Compressor\Gzip;
+                return new Gzip;
 
             default:
-                throw new InvalidArgumentException("Compression type '{$type}' is not supported. Known values are: gz, gzip");
+                throw new InvalidArgumentException(
+                    "Compression type '{$type}' is not supported. Known values are: gz, gzip"
+                );
         }
     }
 
@@ -89,6 +91,7 @@ abstract class AbstractDatabaseCommand extends AbstractMagentoCommand
      */
     protected function getMysqlClientToolConnectionString()
     {
+        /** @see DatabaseHelper::getMysqlClientToolConnectionString */
         return $this->getHelper('database')->getMysqlClientToolConnectionString();
     }
 
