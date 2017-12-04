@@ -351,6 +351,7 @@ HELP;
                 // Patch installer
                 $this->patchMagentoInstallerForPHP54($installationFolder);
             }
+            $this->patchMagentoInstallerForMysql56($installationFolder);
         } catch (Exception $e) {
             $output->writeln('<error>' . $e->getMessage() . '</error>');
 
@@ -402,6 +403,21 @@ HELP;
         if (file_exists($installerConfig)) {
             $xml = file_get_contents($installerConfig);
             file_put_contents($installerConfig, str_replace('<pdo_mysql/>', '<pdo_mysql>1</pdo_mysql>', $xml));
+        }
+    }
+
+    /**
+     * @param string $magentoFolder
+     */
+    protected function patchMagentoInstallerForMysql56($magentoFolder)
+    {
+        $filePath = $magentoFolder
+            . DIRECTORY_SEPARATOR
+            . 'app/code/core/Mage/Install/Model/Installer/Db/Mysql4.php';
+        if (file_exists($filePath)) {
+            $file = file_get_contents($filePath);
+            $replace = '{$variables  = $this->_getConnection()->fetchPairs("SHOW ENGINES");return (isset($variables["InnoDB"]) && $variables["InnoDB"] != "NO");}}';
+            file_put_contents($filePath, preg_replace("/supportEngine(.*)\}/s", $replace, $file));
         }
     }
 
