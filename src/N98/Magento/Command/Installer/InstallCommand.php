@@ -112,22 +112,25 @@ class InstallCommand extends AbstractMagentoCommand
             )->setDescription('Install magento');
 
         $help = <<<HELP
-* Download Magento by a list of git repos and zip files (mageplus, 
+* Download Magento by a list of git repos and zip files (mageplus,
   magelte, official community packages).
 * Try to create database if it does not exist.
 * Installs Magento sample data if available (since version 1.2.0).
 * Starts Magento installer
 * Sets rewrite base in .htaccess file
 
-Example of an unattended Magento CE 1.7.0.2 installation:
+Example of an unattended Magento CE/ Open Source 1.9.3.8 installation:
 
    $ n98-magerun.phar install --dbHost="localhost" --dbUser="mydbuser" \
      --dbPass="mysecret" --dbName="magentodb" --installSampleData=yes \
      --useDefaultConfigParams=yes \
-     --magentoVersionByName="magento-ce-1.7.0.2" \
+     --magentoVersionByName="magento-mirror-1.9.3.8" \
      --installationFolder="magento" --baseUrl="http://magento.localdomain/"
 
-Additionally, with --noDownload option you can install Magento working 
+(Magento is only freely available via Github with Magerun, it uses the best
+community mirror)
+
+Additionally, with --noDownload option you can install Magento working
 copy already stored in --installationFolder on the given database.
 
 See it in action: http://youtu.be/WU-CbJ86eQc
@@ -310,14 +313,21 @@ HELP;
             $package = $this->createComposerPackageByConfig($this->config['magentoVersionData']);
             $this->config['magentoPackage'] = $package;
 
-            if (file_exists($this->config['installationFolder'] . '/app/Mage.php')) {
-                $output->writeln('<error>A magento installation already exists in this folder </error>');
+            $installationFolder = $this->config['installationFolder'];
+
+            if (file_exists($installationFolder . '/app/Mage.php')) {
+                $output->writeln(
+                    sprintf(
+                        '<error>A magento installation already exists in this folder "%s"</error>',
+                        $installationFolder
+                    )
+                );
 
                 return false;
             }
 
             $composer = $this->getComposer($input, $output);
-            $targetFolder = $this->getTargetFolderByType($composer, $package, $this->config['installationFolder']);
+            $targetFolder = $this->getTargetFolderByType($composer, $package, $installationFolder);
             $this->config['magentoPackage'] = $this->downloadByComposerConfig(
                 $input,
                 $output,
@@ -328,18 +338,18 @@ HELP;
 
             if ($this->isSourceTypeRepository($package->getSourceType())) {
                 $filesystem = new \N98\Util\Filesystem;
-                $filesystem->recursiveCopy($targetFolder, $this->config['installationFolder'], array('.git', '.hg'));
+                $filesystem->recursiveCopy($targetFolder, $installationFolder, array('.git', '.hg'));
             } else {
                 $filesystem = new \Composer\Util\Filesystem();
                 $filesystem->copyThenRemove(
-                    $this->config['installationFolder'] . '/_n98_magerun_download',
-                    $this->config['installationFolder']
+                    $installationFolder . '/_n98_magerun_download',
+                    $installationFolder
                 );
             }
 
             if (version_compare(PHP_VERSION, '5.4.0') >= 0) {
                 // Patch installer
-                $this->patchMagentoInstallerForPHP54($this->config['installationFolder']);
+                $this->patchMagentoInstallerForPHP54($installationFolder);
             }
         } catch (Exception $e) {
             $output->writeln('<error>' . $e->getMessage() . '</error>');
@@ -1003,6 +1013,7 @@ HELP;
         try {
             Exec::run($installCommand, $installationOutput, $returnStatus);
         } catch (Exception $installException) {
+            /* fall-through intended */
         }
 
         if (isset($installException) || $returnStatus !== Exec::CODE_CLEAN_EXIT) {

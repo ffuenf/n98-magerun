@@ -1,6 +1,6 @@
-========================
-netz98 magerun CLI tools
-========================
+======================================
+netz98 magerun CLI tools for Magento 1
+======================================
 
 The n98 magerun cli tools provides some handy tools to work with Magento from command line.
 
@@ -28,13 +28,16 @@ Build Status
 |                        |    :target: https://codecov.io/github/netz98/n98-magerun?branch=develop                       |
 +------------------------+-----------------------------------------------------------------------------------------------+
 
+Development is done in **develop** branch.
+
+This software is only running with Magento 1.
+
+If you use Magento 2 please use another stable version (https://github.com/netz98/n98-magerun2).
+
 Compatibility
 -------------
-The tools will automatically be tested for multiple PHP versions (5.3, 5.4, 5.5). It's currently running in various Linux distributions and Mac OS X.
+The tools will automatically be tested for multiple PHP versions. It's currently running in various Linux distributions and Mac OS X.
 Microsoft Windows is not fully supported (some Commands like `db:dump` or `install` are excluded).
-
-The tool partially works with Magento 2 development branch.
-
 
 Installation
 ------------
@@ -50,11 +53,17 @@ Download the latest stable N98-Magerun phar-file from the file-server_:
 
    wget https://files.magerun.net/n98-magerun.phar
 
-Verify the download by comparing the MD5 checksum with the one on the website:
+or if you prefer to use Curl:
 
 .. code-block:: sh
 
-    md5sum n98-magerun.phar
+   curl -O https://files.magerun.net/n98-magerun.phar
+
+Verify the download by comparing the SHA256 checksum with the one on the website at https://files.magerun.net/:
+
+.. code-block:: sh
+
+    shasum -a256 n98-magerun.phar
 
 If it shows the same checksum as on the website, you downloaded the file successfully.
 
@@ -106,6 +115,17 @@ be useful if you exchange scripts that are making use of magerun with other user
 
 Install with Composer
 """""""""""""""""""""
+Require Magerun within the Magento (or any other) project and you can then
+execute it from the vendor’s bin folder:
+
+.. code-block:: sh
+
+    composer require n98/magerun
+    # ...
+    ./vendor/bin/n98-magerun --version
+    n98-magerun version 1.97.0 by netz98 new media GmbH
+
+Alternative source install:
 
 https://github.com/netz98/n98-magerun/wiki/Install-from-source-with-Composer
 
@@ -139,6 +159,48 @@ If file was installed system wide do not forget "sudo".
 
 See it in action: http://youtu.be/wMHpfKD9vjM
 
+Autocompletion
+--------------
+
+Files for autocompletion with Magerun can be found inside the folder `res/autocompletion`, In
+the following some more information about two specific ones (Bash, Phpstorm), there are
+more (e.g. Fish, Zsh).
+
+Bash
+""""
+
+Bash completion is available pre-generated, all commands and their respective
+options are availble on tab. To get completion for an otion type two dashes
+("--") and then tab.
+
+To install the completion files, copy **n98-magerun.phar.bash** to your bash
+compatdir folder for autocompletion.
+
+On my Ubuntu system this can be done with the following command:
+
+.. code-block:: sh
+
+   # cp res/autocompletion/bash/n98-magerun.phar.bash /etc/bash_completion.d
+
+The concrete folder can be obtained via pkg-config::
+
+.. code-block:: sh
+
+# pkg-config --variable=compatdir bash-completion
+
+Detailed information is available in the bash-completions FAQ: https://github.com/scop/bash-completion#faq
+
+PHPStorm
+""""""""
+
+A commandline tool autocompletion XML file for PHPStorm exists in subfolder **res/autocompletion/phpstorm**.
+Copy **n98_magerun.xml** into your phpstorm config folder.
+
+Linux and Mac: ~/.WebIde80/config/componentVersions
+
+You can also add the XML content over settings menu.
+For further instructions read this blog post: http://blog.jetbrains.com/webide/2012/10/integrating-composer-command-line-tool-with-phpstorm/
+
 Usage / Commands
 ----------------
 
@@ -166,6 +228,9 @@ Global config parameters:
       Do not load any custom config.
   --skip-root-check
       Do not check if n98-magerun runs as root.
+  --developer-mode
+      Instantiate Magento in Developer Mode
+
 
 Open Shop in Browser
 """"""""""""""""""""
@@ -363,7 +428,7 @@ Available Table Groups:
 * @customers Customer data
 * @trade Current trade data (customers and orders). You usally do not want those in developer systems.
 * @search Search related tables (catalogsearch_)
-* @development Removes logs, sessions and trade data so developers do not have to work with real customer data
+* @development Removes logs, sessions, trade data and admin users so developers do not have to work with real customer data or admin user accounts
 * @idx Tables with _idx suffix and index event tables
 
 Extended: https://github.com/netz98/n98-magerun/wiki/Stripped-Database-Dumps
@@ -413,7 +478,10 @@ Opens the MySQL console client with your database settings from local.xml
 
 .. code-block:: sh
 
-   $ n98-magerun.phar db:console
+   $ n98-magerun.phar db:console [--no-auto-rehash]
+
+  --no-auto-rehash
+      synonym for calling *mysql* client with the -A parameter to skip hashing for object auto-completion.
 
 Database Create
 """""""""""""""
@@ -559,6 +627,25 @@ Loops all Magento indexes and triggers reindex.
 
    $ n98-magerun.phar index:reindex:all
 
+List Enterprise Mview Changelog Indexes
+"""""""""""""""""""""""""""""""""""""""
+
+Lists the Mview indexers available, as well as their current version and how many are in the changelog queue .
+
+.. code-block:: sh
+
+   $ n98-magerun.phar index:list:mview [--format[="..."]]
+
+Reindex an Enterprise Mview Changelog Index
+"""""""""""""""""""""""""""""""""""""""""""
+
+Index by Mview table code. This will ignore all locks and trigger the changelog indexer.
+
+.. code-block:: sh
+
+   $ n98-magerun.phar index:reindex:mview [table_code]
+
+
 Generate local.xml file
 """""""""""""""""""""""
 
@@ -685,13 +772,17 @@ If you would like to clean only one cache type:
 
 .. code-block:: sh
 
-   $ n98-magerun.phar cache:clean [code]
+   $ n98-magerun.phar cache:clean [--reinit] [--no-reinit] [<code>]
 
 If you would like to clean multiple cache types at once:
 
 .. code-block:: sh
 
-   $ n98-magerun.phar cache:clean [code] [code] ...
+   $ n98-magerun.phar cache:clean [--reinit] [--no-reinit] [<code>] [<code>] ...
+
+Options:
+    --reinit Reinitialise the config cache after cleaning (Default)
+    --no-reinit Don't reinitialise the config cache after cleaning. This will override --reinit.
 
 If you would like to remove all cache entries use `cache:flush`
 
@@ -700,9 +791,15 @@ Run `cache:list` command to see all codes.
 Remove all cache entries
 """"""""""""""""""""""""
 
+Flush the entire cache.
+
 .. code-block:: sh
 
-   $ n98-magerun.phar cache:flush
+   $ n98-magerun.phar cache:flush [--reinit] [--no-reinit]
+
+Options:
+    --reinit Reinitialise the config cache after flushing (Default)
+    --no-reinit Don't reinitialise the config cache after flushing. This will override --reinit.
 
 List Magento caches
 """""""""""""""""""
@@ -753,7 +850,7 @@ Prints stored cache entry by ID.
 If value is serialized you can force a pretty output with --unserialize option.
 
 Toggle CMS Block
-"""""""""""
+""""""""""""""""
 
 Toggle "is_active" on a cms block
 
@@ -762,6 +859,15 @@ Toggle "is_active" on a cms block
    $ n98-magerun.phar cms:block:toggle [block_id]
 
 "block_id" can be an entity id or an "identifier"
+
+List CMS Blocks
+""""""""""""""""
+
+List all CMS blocks
+
+.. code-block:: sh
+
+   $ n98-magerun.phar cms:block:list [--format[="..."]]
 
 Demo Notice
 """""""""""
@@ -921,10 +1027,11 @@ Runs a cronjob by code.
 
 .. code-block:: sh
 
-   $ n98-magerun.phar sys:cron:run [job]
+   $ n98-magerun.phar sys:cron:run [--schedule] [job]
 
 If no `job` argument is passed you can select a job from a list.
 See it in action: http://www.youtube.com/watch?v=QkzkLgrfNaM
+If option schedule is present, cron is not launched, but just scheduled immediately in magento crontab.
 
 Cronjob History
 """""""""""""""
@@ -1212,8 +1319,9 @@ Development IDE Support
 
 .. code-block:: sh
 
-   $ n98-magerun.phar dev:ide:phpstorm:meta [--stdout]
+   $ n98-magerun.phar dev:ide:phpstorm:meta [--meta-version=(old|2016.2+)] [--stdout]
 
+Generates meta data file for PhpStorm auto completion (default version : 2016.2+)
 
 Reports
 """""""
@@ -1447,7 +1555,6 @@ Create dummy attribute values (ONLY FOR DROPDOWN ATTRIBUTE)
 | `values-number`              | Number of Values to create (default 1)       | only integer                                                 |
 +------------------------------+----------------------------------------------+--------------------------------------------------------------+
 
-
 List Extensions
 """""""""""""""
 
@@ -1670,31 +1777,6 @@ If you want to execute a script from the repository this can be done by *script:
 
 Script argument is optional. If you don't specify any you can select one from a list.
 
-Autocompletion
---------------
-
-Bash
-""""
-
-Copy the file **bash_complete** to **n98-magerun.phar** in your bash autocomplete folder.
-In my Ubuntu system this can be done with the following command:
-
-.. code-block:: sh
-
-   $ sudo cp autocompletion/bash/bash_complete /etc/bash_completion.d/n98-magerun.phar
-
-
-PHPStorm 8.0.*
-""""""""
-
-A commandline tool autocompletion XML file for PHPStorm exists in subfolder **autocompletion/phpstorm**.
-Copy **n98_magerun.xml** into your phpstorm config folder.
-
-Linux and Mac: ~/.WebIde80/config/componentVersions
-
-You can also add the XML content over settings menu.
-For further instructions read this blog post: http://blog.jetbrains.com/webide/2012/10/integrating-composer-command-line-tool-with-phpstorm/
-
 Advanced usage
 --------------
 
@@ -1768,8 +1850,3 @@ Thanks to
 * Symfony2 Team for the great console component.
 * Composer Team for the downloader backend and the self-update command.
 * Francois Zaninotto for great Faker library.
-
-
-.. image:: https://d2weczhvl823v0.cloudfront.net/netz98/n98-magerun/trend.png
-   :alt: Bitdeli badge
-   :target: https://bitdeli.com/free

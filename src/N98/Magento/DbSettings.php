@@ -4,6 +4,7 @@
  *
  * @author Tom Klingenberg <https://github.com/ktomk>
  */
+
 namespace N98\Magento;
 
 use ArrayAccess;
@@ -97,7 +98,7 @@ class DbSettings implements ArrayAccess, IteratorAggregate
             'password'    => null,
         );
 
-        $config = ((array) $resources->default_setup->connection) + $config;
+        $config = array_merge($config, (array) $resources->default_setup->connection);
         $config['prefix'] = (string) $resources->db->table_prefix;
 
         // known parameters: host, port, unix_socket, dbname, username, password, options, charset, persistent,
@@ -202,7 +203,7 @@ class DbSettings implements ArrayAccess, IteratorAggregate
         if (null !== $this->config['unix_socket']) {
             $segments[] = '--socket=' . escapeshellarg($this->config['unix_socket']);
         } else {
-            $segments[] = '-h' . escapeshellarg($this->config['host']);
+            $segments[] = '-h ' . escapeshellarg($this->config['host']);
         }
 
         $segments[] = '-u' . escapeshellarg($this->config['username']);
@@ -234,7 +235,8 @@ class DbSettings implements ArrayAccess, IteratorAggregate
             throw new InvalidArgumentException(
                 sprintf(
                     'Invalid identifier, must not contain NUL and must be UTF-8 encoded in the BMP: %s (hex: %s)',
-                    var_export($identifier), bin2hex($identifier)
+                    var_export($identifier, true),
+                    bin2hex($identifier)
                 )
             );
         }

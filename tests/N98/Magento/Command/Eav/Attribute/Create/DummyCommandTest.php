@@ -2,12 +2,11 @@
 
 namespace N98\Magento\Command\Eav\Attribute\Create;
 
+use N98\Magento\Command\TestCase;
 use Symfony\Component\Console\Tester\CommandTester;
-use N98\Magento\Command\PHPUnit\TestCase;
 
 class DummyCommandTest extends TestCase
 {
-
     public function testExecute()
     {
         $application = $this->getApplication();
@@ -21,7 +20,7 @@ class DummyCommandTest extends TestCase
                 'locale'        => "en_US",
                 'attribute-id'  => 92,
                 'values-type'   => 'int',
-                'values-number' => 1
+                'values-number' => 1,
             )
         );
 
@@ -33,38 +32,38 @@ class DummyCommandTest extends TestCase
         $application = $this->getApplication();
         $application->add(new DummyCommand());
         $command = $application->find('eav:attribute:create-dummy-values');
-        
+
         $dialog = $this->getMock('Symfony\Component\Console\Helper\QuestionHelper', array('ask'));
 
         // ASK - attribute-id
         $dialog->expects($this->any())
-            ->method('ask')
-            ->with(
-                $this->isInstanceOf('Symfony\Component\Console\Input\InputInterface'),
-                $this->isInstanceOf('Symfony\Component\Console\Output\OutputInterface'),
-                $this->isInstanceOf('Symfony\Component\Console\Question\Question')
-            )
-            ->will($this->returnValue(92));
+               ->method('ask')
+               ->with(
+                   $this->isInstanceOf('Symfony\Component\Console\Input\InputInterface'),
+                   $this->isInstanceOf('Symfony\Component\Console\Output\OutputInterface'),
+                   $this->isInstanceOf('Symfony\Component\Console\Question\Question')
+               )
+               ->will($this->returnValue(92));
 
         // ASK - values-type
         $dialog->expects($this->any())
-            ->method('ask')
-            ->with(
-                $this->isInstanceOf('Symfony\Component\Console\Input\InputInterface'),
-                $this->isInstanceOf('Symfony\Component\Console\Output\OutputInterface'),
-                $this->isInstanceOf('Symfony\Component\Console\Question\Question')
-            )
-            ->will($this->returnValue('int'));
+               ->method('ask')
+               ->with(
+                   $this->isInstanceOf('Symfony\Component\Console\Input\InputInterface'),
+                   $this->isInstanceOf('Symfony\Component\Console\Output\OutputInterface'),
+                   $this->isInstanceOf('Symfony\Component\Console\Question\Question')
+               )
+               ->will($this->returnValue('int'));
 
         // ASK - values-number
         $dialog->expects($this->any())
-            ->method('ask')
-            ->with(
-                $this->isInstanceOf('Symfony\Component\Console\Input\InputInterface'),
-                $this->isInstanceOf('Symfony\Component\Console\Output\OutputInterface'),
-                $this->isInstanceOf('Symfony\Component\Console\Question\Question')
-            )
-            ->will($this->returnValue(1));
+               ->method('ask')
+               ->with(
+                   $this->isInstanceOf('Symfony\Component\Console\Input\InputInterface'),
+                   $this->isInstanceOf('Symfony\Component\Console\Output\OutputInterface'),
+                   $this->isInstanceOf('Symfony\Component\Console\Question\Question')
+               )
+               ->will($this->returnValue(1));
 
         // We override the standard helper with our mock
         $command->getHelperSet()->set($dialog, 'dialog');

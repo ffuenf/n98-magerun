@@ -5,6 +5,7 @@ namespace N98\Magento\Command\System\Setup;
 use N98\JUnitXml\Document as JUnitXmlDocument;
 use N98\Magento\Command\AbstractMagentoCommand;
 use N98\Util\Console\Helper\Table\Renderer\RendererFactory;
+use N98\Util\Console\Helper\TableHelper;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
@@ -50,10 +51,10 @@ HELP;
         }
 
         $time = microtime(true);
-        $modules            = \Mage::getConfig()->getNode('modules');
-        $resourceModel      = $this->_getResourceSingleton('core/resource', 'Mage_Core_Model_Resource_Resource');
-        $setups             = \Mage::getConfig()->getNode('global/resources')->children();
-        $ignoreDataUpdate   = $input->getOption('ignore-data');
+        $modules = \Mage::getConfig()->getNode('modules');
+        $resourceModel = $this->_getResourceSingleton('core/resource', 'Mage_Core_Model_Resource_Resource');
+        $setups = \Mage::getConfig()->getNode('global/resources')->children();
+        $ignoreDataUpdate = $input->getOption('ignore-data');
 
         $headers = array('Setup', 'Module', 'DB', 'Data', 'Status');
         if ($ignoreDataUpdate) {
@@ -65,9 +66,9 @@ HELP;
         $errorCounter = 0;
         $table = array();
         foreach ($setups as $setupName => $setup) {
-            $moduleName    = (string) $setup->setup->module;
+            $moduleName = (string) $setup->setup->module;
             $moduleVersion = (string) $modules->{$moduleName}->version;
-            $dbVersion     = (string) $resourceModel->getDbVersion($setupName);
+            $dbVersion = (string) $resourceModel->getDbVersion($setupName);
             if (!$ignoreDataUpdate) {
                 $dataVersion = (string) $resourceModel->getDataVersion($setupName);
             }
@@ -118,9 +119,9 @@ HELP;
             });
 
             array_walk($table, function (&$row) {
-                $status             = $row['Status'];
-                $availableStatus    = array('OK' => 'info', 'Error' => 'error');
-                $statusString       = sprintf(
+                $status = $row['Status'];
+                $availableStatus = array('OK' => 'info', 'Error' => 'error');
+                $statusString = sprintf(
                     '<%s>%s</%s>',
                     $availableStatus[$status],
                     $status,
@@ -133,7 +134,9 @@ HELP;
         if ($input->getOption('log-junit')) {
             $this->logJUnit($table, $input->getOption('log-junit'), microtime($time) - $time);
         } else {
-            $this->getHelper('table')
+            /* @var $tableHelper TableHelper */
+            $tableHelper = $this->getHelper('table');
+            $tableHelper
                 ->setHeaders($headers)
                 ->renderByFormat($output, $table, $input->getOption('format'));
 

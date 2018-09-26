@@ -29,7 +29,7 @@ _n98-magerun()
 
     # completing for an option
     if [[ ${cur} == --* ]] ; then
-        opts="--help --quiet --verbose --version --ansi --no-ansi --no-interaction --root-dir --skip-config --skip-root-check"
+        opts="--help --quiet --verbose --version --ansi --no-ansi --no-interaction --root-dir --skip-config --skip-root-check --developer-mode"
 
         case "$com" in
             help)
@@ -72,7 +72,7 @@ _n98-magerun()
             opts="${opts} --format"
             ;;
             cache:clean)
-            opts="${opts} "
+            opts="${opts} --reinit --no-reinit"
             ;;
             cache:dir:flush)
             opts="${opts} "
@@ -84,7 +84,7 @@ _n98-magerun()
             opts="${opts} "
             ;;
             cache:flush)
-            opts="${opts} "
+            opts="${opts} --reinit --no-reinit"
             ;;
             cache:list)
             opts="${opts} --format"
@@ -94,6 +94,9 @@ _n98-magerun()
             ;;
             cache:view)
             opts="${opts} --unserialize --fpc"
+            ;;
+            category:create:dummy)
+            opts="${opts} "
             ;;
             cms:block:toggle)
             opts="${opts} "
@@ -105,16 +108,16 @@ _n98-magerun()
             opts="${opts} --name --description --author --type --homepage --require --require-dev --stability --license --repository"
             ;;
             composer:install)
-            opts="${opts} --prefer-source --prefer-dist --dry-run --dev --no-dev --no-plugins --no-custom-installers --no-autoloader --no-scripts --no-progress --optimize-autoloader --classmap-authoritative --ignore-platform-reqs"
+            opts="${opts} --prefer-source --prefer-dist --dry-run --dev --no-dev --no-custom-installers --no-autoloader --no-scripts --no-progress --no-suggest --optimize-autoloader --classmap-authoritative --apcu-autoloader --ignore-platform-reqs"
             ;;
             composer:require)
-            opts="${opts} --dev --prefer-source --prefer-dist --no-plugins --no-progress --no-update --update-no-dev --update-with-dependencies --ignore-platform-reqs --sort-packages --optimize-autoloader --classmap-authoritative"
+            opts="${opts} --dev --prefer-source --prefer-dist --no-progress --no-suggest --no-update --no-scripts --update-no-dev --update-with-dependencies --ignore-platform-reqs --prefer-stable --prefer-lowest --sort-packages --optimize-autoloader --classmap-authoritative --apcu-autoloader"
             ;;
             composer:search)
-            opts="${opts} --only-name"
+            opts="${opts} --only-name --type"
             ;;
             composer:update)
-            opts="${opts} --prefer-source --prefer-dist --dry-run --dev --no-dev --lock --no-plugins --no-custom-installers --no-autoloader --no-scripts --no-progress --with-dependencies --optimize-autoloader --classmap-authoritative --ignore-platform-reqs --prefer-stable --prefer-lowest --interactive --root-reqs"
+            opts="${opts} --prefer-source --prefer-dist --dry-run --dev --no-dev --lock --no-custom-installers --no-autoloader --no-scripts --no-progress --no-suggest --with-dependencies --optimize-autoloader --classmap-authoritative --apcu-autoloader --ignore-platform-reqs --prefer-stable --prefer-lowest --interactive --root-reqs"
             ;;
             composer:validate)
             opts="${opts} --no-check-all --no-check-lock --no-check-publish --with-dependencies --strict"
@@ -132,7 +135,7 @@ _n98-magerun()
             opts="${opts} "
             ;;
             config:set)
-            opts="${opts} --scope --scope-id --encrypt --force"
+            opts="${opts} --scope --scope-id --encrypt --force --no-null"
             ;;
             customer:change-password)
             opts="${opts} "
@@ -153,7 +156,7 @@ _n98-magerun()
             opts="${opts} --format"
             ;;
             db:console)
-            opts="${opts} --use-mycli-instead-of-mysql"
+            opts="${opts} --use-mycli-instead-of-mysql --no-auto-rehash"
             ;;
             db:create)
             opts="${opts} "
@@ -162,7 +165,7 @@ _n98-magerun()
             opts="${opts} --tables --force"
             ;;
             db:dump)
-            opts="${opts} --add-time --compression --xml --hex-blob --only-command --print-only-filename --dry-run --no-single-transaction --human-readable --add-routines --stdout --strip --exclude --force"
+            opts="${opts} --add-time --compression --dump-option --xml --hex-blob --only-command --print-only-filename --dry-run --no-single-transaction --human-readable --add-routines --stdout --strip --exclude --include --force"
             ;;
             db:import)
             opts="${opts} --compression --only-command --only-if-empty --optimize --drop --drop-tables"
@@ -216,7 +219,7 @@ _n98-magerun()
             opts="${opts} --on --off --global"
             ;;
             dev:module:create)
-            opts="${opts} --add-blocks --add-helpers --add-models --add-setup --add-all --modman --add-readme --add-composer --author-name --author-email --description"
+            opts="${opts} --add-controllers --add-blocks --add-helpers --add-models --add-setup --add-all --modman --add-readme --add-composer --author-name --author-email --description"
             ;;
             dev:module:dependencies:from)
             opts="${opts} --all --format"
@@ -284,6 +287,9 @@ _n98-magerun()
             dev:translate:shop)
             opts="${opts} --on --off"
             ;;
+            eav:attribute:create-dummy-values)
+            opts="${opts} "
+            ;;
             eav:attribute:list)
             opts="${opts} --filter-type --add-source --add-backend --format"
             ;;
@@ -311,13 +317,25 @@ _n98-magerun()
             index:list)
             opts="${opts} --format"
             ;;
+            index:list:mview)
+            opts="${opts} --format"
+            ;;
             index:reindex)
             opts="${opts} "
             ;;
             index:reindex:all)
             opts="${opts} "
             ;;
+            index:reindex:mview)
+            opts="${opts} "
+            ;;
             local-config:generate)
+            opts="${opts} "
+            ;;
+            media:cache:image:clear)
+            opts="${opts} "
+            ;;
+            media:cache:jscss:clear)
             opts="${opts} "
             ;;
             media:dump)
@@ -328,9 +346,6 @@ _n98-magerun()
             ;;
             script:repo:run)
             opts="${opts} --define --stop-on-error"
-            ;;
-            seo:check)
-            opts="${opts} "
             ;;
             sys:check)
             opts="${opts} --format"
@@ -363,7 +378,7 @@ _n98-magerun()
             opts="${opts} "
             ;;
             sys:setup:run)
-            opts="${opts} "
+            opts="${opts} --no-implicit-cache-flush"
             ;;
             sys:store:config:base-url:list)
             opts="${opts} --format"
@@ -388,7 +403,7 @@ _n98-magerun()
 
     # completing for a command
     if [[ $cur == $com ]]; then
-        coms="help install list open-browser script shell uninstall admin:notifications admin:user:change-password admin:user:change-status admin:user:create admin:user:delete admin:user:list cache:clean cache:dir:flush cache:disable cache:enable cache:flush cache:list cache:report cache:view cms:block:toggle composer:diagnose composer:init composer:install composer:require composer:search composer:update composer:validate config:delete config:dump config:get config:search config:set customer:change-password customer:create customer:create:dummy customer:delete customer:info customer:list db:console db:create db:drop db:dump db:import db:info db:maintain:check-tables db:query db:status db:variables design:demo-notice dev:class:lookup dev:code:model:method dev:console dev:email-template:usage dev:ide:phpstorm:meta dev:log dev:log:db dev:log:size dev:merge-css dev:merge-js dev:module:create dev:module:dependencies:from dev:module:dependencies:on dev:module:disable dev:module:enable dev:module:list dev:module:observer:list dev:module:rewrite:conflicts dev:module:rewrite:list dev:module:update dev:profiler dev:report:count dev:setup:script:attribute dev:symlinks dev:template-hints dev:template-hints-blocks dev:theme:duplicates dev:theme:info dev:theme:list dev:translate:admin dev:translate:export dev:translate:set dev:translate:shop eav:attribute:list eav:attribute:remove eav:attribute:view extension:download extension:install extension:list extension:upgrade extension:validate index:list index:reindex index:reindex:all local-config:generate media:dump script:repo:list script:repo:run seo:check sys:check sys:cron:history sys:cron:list sys:cron:run sys:info sys:maintenance sys:setup:change-version sys:setup:compare-versions sys:setup:incremental sys:setup:remove sys:setup:run sys:store:config:base-url:list sys:store:list sys:url:list sys:website:list"
+        coms="help install list open-browser script shell uninstall admin:notifications admin:user:change-password admin:user:change-status admin:user:create admin:user:delete admin:user:list cache:clean cache:dir:flush cache:disable cache:enable cache:flush cache:list cache:report cache:view category:create:dummy cms:block:toggle composer:diagnose composer:init composer:install composer:require composer:search composer:update composer:validate config:delete config:dump config:get config:search config:set customer:change-password customer:create customer:create:dummy customer:delete customer:info customer:list db:console db:create db:drop db:dump db:import db:info db:maintain:check-tables db:query db:status db:variables design:demo-notice dev:class:lookup dev:code:model:method dev:console dev:email-template:usage dev:ide:phpstorm:meta dev:log dev:log:db dev:log:size dev:merge-css dev:merge-js dev:module:create dev:module:dependencies:from dev:module:dependencies:on dev:module:disable dev:module:enable dev:module:list dev:module:observer:list dev:module:rewrite:conflicts dev:module:rewrite:list dev:module:update dev:profiler dev:report:count dev:setup:script:attribute dev:symlinks dev:template-hints dev:template-hints-blocks dev:theme:duplicates dev:theme:info dev:theme:list dev:translate:admin dev:translate:export dev:translate:set dev:translate:shop eav:attribute:create-dummy-values eav:attribute:list eav:attribute:remove eav:attribute:view extension:download extension:install extension:list extension:upgrade extension:validate index:list index:list:mview index:reindex index:reindex:all index:reindex:mview local-config:generate media:cache:image:clear media:cache:jscss:clear media:dump script:repo:list script:repo:run sys:check sys:cron:history sys:cron:list sys:cron:run sys:info sys:maintenance sys:setup:change-version sys:setup:compare-versions sys:setup:incremental sys:setup:remove sys:setup:run sys:store:config:base-url:list sys:store:list sys:url:list sys:website:list"
 
         COMPREPLY=($(compgen -W "${coms}" -- ${cur}))
         __ltrim_colon_completions "$cur"

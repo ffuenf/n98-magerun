@@ -2,7 +2,7 @@
 
 namespace N98\Magento\Command\Database;
 
-use N98\Magento\Command\PHPUnit\TestCase;
+use N98\Magento\Command\TestCase;
 use SplFileInfo;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Tester\CommandTester;
@@ -40,7 +40,7 @@ class DumpCommandTest extends TestCase
                 '--add-time'     => true,
                 '--only-command' => true,
                 '--force'        => true,
-                '--compression'  => 'gz'
+                '--compression'  => 'gz',
             )
         );
 
@@ -69,7 +69,7 @@ class DumpCommandTest extends TestCase
                 array('filename' => 'foo.sql', '--add-time' => 'prefix', ),
             ),
             # testAddTimeOffFilenameSpecified
-            array('/^foo.sql$/', array('filename' => 'foo.sql', '--add-time' => false, )),
+            array('/^foo.sql$/', array('filename' => 'foo.sql', '--add-time' => 'no', )),
             # testAddTimeFilenameSpecifiedRelative
             array('/^..\/foo_[0-9]{4}-[0-9]{2}-[0-9]{2}_[0-9]{6}\.sql$/', array('filename' => '../foo.sql', )),
         );
@@ -88,19 +88,17 @@ class DumpCommandTest extends TestCase
         $command = $this->getCommand();
 
         $mandatory = array(
-            'command' => $command->getName(),
-            '--force' => true,
+            'command'               => $command->getName(),
+            '--force'               => true,
             '--print-only-filename' => true,
-            '--dry-run' => null,
+            '--dry-run'             => null,
         );
 
         $defaults = array(
             '--add-time' => true,
         );
 
-        $commandTester = new CommandTester($command);
-        $commandTester->execute($mandatory + $options + $defaults);
-        $this->assertRegExp($regex, $commandTester->getDisplay());
+        $this->assertDisplayRegExp($mandatory + $options + $defaults, $regex);
     }
 
     public function testWithStripOption()
@@ -117,7 +115,7 @@ class DumpCommandTest extends TestCase
                 '--only-command' => true,
                 '--force'        => true,
                 '--strip'        => '@development not_existing_table_1',
-                '--compression'  => 'gzip'
+                '--compression'  => 'gzip',
             )
         );
 
@@ -131,7 +129,6 @@ class DumpCommandTest extends TestCase
         $this->assertRegExp("/--ignore-table=$db.sales_flat_order_item/", $commandTester->getDisplay());
         $this->assertNotContains("not_existing_table_1", $commandTester->getDisplay());
         $this->assertContains(".sql.gz", $commandTester->getDisplay());
-
 
         /**
          * Uncompressed
@@ -147,7 +144,70 @@ class DumpCommandTest extends TestCase
             )
         );
         $this->assertNotContains(".sql.gz", $commandTester->getDisplay());
+    }
 
+    public function testWithIncludeExcludeOptions()
+    {
+        $command = $this->getCommand();
+        $this->getApplication()->initMagento();
+        $dbConfig = $this->getDatabaseConnection()->getConfig();
+        $db = $dbConfig['dbname'];
+
+        /**
+         * Exclude
+         */
+        $commandTester = new CommandTester($command);
+        $commandTester->execute(
+            array(
+                'command'        => $command->getName(),
+                '--add-time'     => true,
+                '--only-command' => true,
+                '--force'        => true,
+                '--exclude'      => 'core_config_data',
+                '--compression'  => 'gzip',
+            )
+        );
+        $this->assertRegExp("/--ignore-table=$db\.core_config_data/", $commandTester->getDisplay());
+
+        /**
+         * Include
+         */
+        $commandTester = new CommandTester($command);
+        $commandTester->execute(
+            array(
+                'command'        => $command->getName(),
+                '--add-time'     => true,
+                '--only-command' => true,
+                '--force'        => true,
+                '--include'      => 'core_config_data',
+                '--compression'  => 'gzip',
+            )
+        );
+        $this->assertNotRegExp("/--ignore-table=$db\.core_config_data/", $commandTester->getDisplay());
+        $this->assertRegExp("/--ignore-table=$db\.catalog_product_entity/", $commandTester->getDisplay());
+    }
+
+    public function testIncludeExcludeMutualExclusivity()
+    {
+        /**
+         * Both include and exclude.
+         */
+        $command = $this->getCommand();
+        $this->getApplication()->initMagento();
+        $this->setExpectedException('InvalidArgumentException', 'Cannot specify --include with --exclude');
+
+        $commandTester = new CommandTester($command);
+        $commandTester->execute(
+            array(
+                'command'        => $command->getName(),
+                '--add-time'     => true,
+                '--only-command' => true,
+                '--force'        => true,
+                '--include'      => 'core_config_data',
+                '--exclude'      => 'catalog_product_entity',
+                '--compression'  => 'gzip',
+            )
+        );
     }
 
     /**

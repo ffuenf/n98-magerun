@@ -5,13 +5,14 @@ namespace N98\Magento\Command\Database\Maintain;
 use InvalidArgumentException;
 use N98\Magento\Command\AbstractMagentoCommand;
 use N98\Util\Console\Helper\Table\Renderer\RendererFactory;
+use N98\Util\Console\Helper\TableHelper;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 
 class CheckTablesCommand extends AbstractMagentoCommand
 {
-    const MESSAGE_CHECK_NOT_SUPPORTED  = 'The storage engine for the table doesn\'t support check';
+    const MESSAGE_CHECK_NOT_SUPPORTED = 'The storage engine for the table doesn\'t support check';
     const MESSAGE_REPAIR_NOT_SUPPORTED = 'The storage engine for the table doesn\'t support repair';
 
     /**
@@ -143,7 +144,7 @@ HELP;
                     array('@check'),
                     array(
                         'check' => array(
-                            'tables' => $input->getOption('table'),
+                            'tables' => explode(' ', $input->getOption('table')),
                         ),
                     )
                 ),
@@ -187,7 +188,9 @@ HELP;
             $progress->finish();
         }
 
-        $this->getHelper('table')
+        /* @var $tableHelper TableHelper */
+        $tableHelper = $this->getHelper('table');
+        $tableHelper
             ->setHeaders(array('Table', 'Operation', 'Type', 'Status'))
             ->renderByFormat($this->output, $tableOutput, $this->input->getOption('format'));
     }

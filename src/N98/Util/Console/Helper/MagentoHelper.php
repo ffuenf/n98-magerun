@@ -260,10 +260,10 @@ class MagentoHelper extends AbstractHelper
 
             $count = $finder->count();
             if ($count > 0) {
-                $this->_magerunStopFileFound  = true;
+                $this->_magerunStopFileFound = true;
                 $this->_magerunStopFileFolder = $searchFolder;
-                $magerunFilePath              = $searchFolder . DIRECTORY_SEPARATOR . $stopFile;
-                $magerunFileContent           = trim(file_get_contents($magerunFilePath));
+                $magerunFilePath = $searchFolder . DIRECTORY_SEPARATOR . $stopFile;
+                $magerunFileContent = trim(file_get_contents($magerunFilePath));
                 if (OutputInterface::VERBOSITY_DEBUG <= $this->output->getVerbosity()) {
                     $message = sprintf(
                         '<debug>Found stopfile \'%s\' file with content <info>%s</info></debug>', $stopFile,
@@ -310,7 +310,7 @@ class MagentoHelper extends AbstractHelper
 
             $hasMageFile = false;
             foreach ($files as $file) {
-                if ($file->getFilename() == 'Mage.php') {
+                if ($file->getFilename() === 'Mage.php') {
                     $hasMageFile = true;
                 }
             }
@@ -318,7 +318,7 @@ class MagentoHelper extends AbstractHelper
             $this->_magentoRootFolder = $searchFolder;
 
             // Magento 2 does not have a god class and thus if this file is not there it is version 2
-            if ($hasMageFile == false) {
+            if ($hasMageFile === false) {
                 $this->_magentoMajorVersion = Application::MAGENTO_MAJOR_VERSION_2;
                 return true; // the rest of this does not matter since we are simply exiting with a notice
             }
@@ -326,7 +326,8 @@ class MagentoHelper extends AbstractHelper
             if (is_callable(array('\Mage', 'getEdition'))) {
                 $this->_magentoEnterprise = (\Mage::getEdition() == 'Enterprise');
             } else {
-                $this->_magentoEnterprise = is_dir($this->_magentoRootFolder . '/app/code/core/Enterprise');
+                $this->_magentoEnterprise = is_dir($this->_magentoRootFolder . '/app/code/core/Enterprise') ||
+                    is_dir($this->_magentoRootFolder . '/app/design/frontend/enterprise/default/layout');
             }
 
             if (OutputInterface::VERBOSITY_DEBUG <= $this->output->getVerbosity()) {

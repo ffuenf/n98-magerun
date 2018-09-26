@@ -239,7 +239,11 @@ abstract class AbstractMagentoCommand extends Command
      * @param bool $preferSource
      * @return \Composer\Package\CompletePackage
      */
-    protected function downloadByComposerConfig(InputInterface $input, OutputInterface $output, $config, $targetFolder,
+    protected function downloadByComposerConfig(
+        InputInterface $input,
+        OutputInterface $output,
+        $config,
+        $targetFolder,
         $preferSource = true
     ) {
         $dm = $this->getComposerDownloadManager($input, $output);
@@ -379,6 +383,38 @@ abstract class AbstractMagentoCommand extends Command
      *
      * @param string $mage1code Magento 1 class code
      * @param string $mage2class Magento 2 class name
+     * @return \Mage_Core_Helper_Abstract
+     */
+    protected function _getHelper($mage1code, $mage2class)
+    {
+        if ($this->_magentoMajorVersion == self::MAGENTO_MAJOR_VERSION_2) {
+            return \Mage::helper($mage2class);
+        } else {
+            return \Mage::helper($mage1code);
+        }
+    }
+
+    /**
+     * Magento 1 / 2 switches
+     *
+     * @param string $mage1code Magento 1 class code
+     * @param string $mage2class Magento 2 class name
+     * @return \Mage_Core_Model_Abstract
+     */
+    protected function _getSingleton($mage1code, $mage2class)
+    {
+        if ($this->_magentoMajorVersion == self::MAGENTO_MAJOR_VERSION_2) {
+            return \Mage::getModel($mage2class);
+        } else {
+            return \Mage::getModel($mage1code);
+        }
+    }
+
+    /**
+     * Magento 1 / 2 switches
+     *
+     * @param string $mage1code Magento 1 class code
+     * @param string $mage2class Magento 2 class name
      * @return \Mage_Core_Model_Abstract
      */
     protected function _getResourceModel($mage1code, $mage2class)
@@ -449,7 +485,6 @@ abstract class AbstractMagentoCommand extends Command
          * @return string
          */
         $validateInstallationFolder = function ($folderName) use ($input) {
-
             $folderName = rtrim(trim($folderName, ' '), '/');
             // resolve folder-name to current working directory if relative
             if (substr($folderName, 0, 1) == '.') {
@@ -476,8 +511,9 @@ abstract class AbstractMagentoCommand extends Command
                 if ($magentoHelper->getRootFolder() !== $folderName) {
                     throw new InvalidArgumentException(
                         sprintf(
-                            'Folder %s is not a Magento working copy.',
-                            $folderName
+                            'Folder "%s" is not a Magento working copy (%s)',
+                            $folderName,
+                            var_export($magentoHelper->getRootFolder(), true)
                         )
                     );
                 }
@@ -549,9 +585,10 @@ abstract class AbstractMagentoCommand extends Command
     }
 
     /**
-     * @param array           $entries zero-indexed array of entries (represented by strings) to select from
+     * @param array $entries zero-indexed array of entries (represented by strings) to select from
      * @param OutputInterface $output
-     * @param string          $question
+     * @param string $question
+     * @return mixed
      */
     protected function askForArrayEntry(array $entries, OutputInterface $output, $question)
     {

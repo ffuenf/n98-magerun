@@ -9,9 +9,7 @@ use Magento\Mtf\EntryPoint\EntryPoint;
 use N98\Magento\Application\Config;
 use N98\Magento\Application\ConfigurationLoader;
 use N98\Magento\Application\Console\Events;
-use N98\Util\AutoloadRestorer;
 use N98\Util\Console\Helper\MagentoHelper;
-use N98\Util\Console\Helper\TwigHelper;
 use N98\Util\OperatingSystem;
 use RuntimeException;
 use Symfony\Component\Console\Application as BaseApplication;
@@ -38,7 +36,7 @@ class Application extends BaseApplication
     /**
      * @var string
      */
-    const APP_VERSION = '1.97.23';
+    const APP_VERSION = '1.101.1';
 
     /**
      * @var int
@@ -60,6 +58,15 @@ class Application extends BaseApplication
 |_||_/_/\\___/   |_|_|_\\__,_\\__, \\___|_|  \\_,_|_||_|
                            |___/
 ";
+
+    /**
+     * Shadow copy of the Application parent when using this concrete setAutoExit() implementation
+     *
+     * @see \Symfony\Component\Console\Application::$autoExit
+     * @var bool
+     */
+    private $autoExitShadow = true;
+
     /**
      * @var ClassLoader
      */
@@ -112,6 +119,11 @@ class Application extends BaseApplication
     protected $_magerunStopFileFolder = null;
 
     /**
+     * @var null
+     */
+    protected $_magerunUseDeveloperMode = null;
+
+    /**
      * @var bool
      */
     protected $_isInitialized = false;
@@ -140,6 +152,19 @@ class Application extends BaseApplication
     {
         $this->autoloader = $autoloader;
         parent::__construct(self::APP_NAME, self::APP_VERSION);
+    }
+
+    /**
+     * @param bool $boolean
+     * @return bool previous auto-exit state
+     */
+    public function setAutoExit($boolean)
+    {
+        $previous = $this->autoExitShadow;
+        $this->autoExitShadow = $boolean;
+        parent::setAutoExit($boolean);
+
+        return $previous;
     }
 
     /**
@@ -181,6 +206,17 @@ class Application extends BaseApplication
             'Do not check if n98-magerun runs as root'
         );
         $inputDefinition->addOption($skipExternalConfig);
+
+        /**
+         * Developer Mode
+         */
+        $rootDirOption = new InputOption(
+            '--developer-mode',
+            '',
+            InputOption::VALUE_NONE,
+            'Instantiate Magento in Developer Mode'
+        );
+        $inputDefinition->addOption($rootDirOption);
 
         return $inputDefinition;
     }
@@ -229,6 +265,7 @@ class Application extends BaseApplication
         $this->_magentoMajorVersion = $magentoHelper->getMajorVersion();
         $this->_magerunStopFileFound = $magentoHelper->isMagerunStopFileFound();
         $this->_magerunStopFileFolder = $magentoHelper->getMagerunStopFileFolder();
+        $this->_magerunUseDeveloperMode = ($input->getParameterOption('--developer-mode'));
     }
 
     /**
@@ -241,19 +278,19 @@ class Application extends BaseApplication
         $helperSet = $this->getHelperSet();
         $config = $this->config->getConfig();
 
-        // Twig
-        $twigBaseDirs = array(
-            __DIR__ . '/../../../res/twig',
-        );
-        if (isset($config['twig']['baseDirs']) && is_array($config['twig']['baseDirs'])) {
-            $twigBaseDirs = array_merge(array_reverse($config['twig']['baseDirs']), $twigBaseDirs);
-        }
-        $helperSet->set(new TwigHelper($twigBaseDirs), 'twig');
-
         foreach ($config['helpers'] as $helperName => $helperClass) {
-            if (class_exists($helperClass)) {
-                $helperSet->set(new $helperClass(), $helperName);
+            if (!class_exists($helperClass)) {
+                throw new RuntimeException(
+                    sprintf('Nonexistent helper class: "%s", check helpers configuration', $helperClass)
+                );
             }
+
+            // Twig helper needs the config-file
+            $helper = 'N98\Util\Console\Helper\TwigHelper' === $helperClass
+                ? new $helperClass($this->config)
+                : new $helperClass()
+            ;
+            $helperSet->set($helper, $helperName);
         }
     }
 
@@ -296,8 +333,7 @@ class Application extends BaseApplication
     {
         trigger_error(__METHOD__ . ' moved, use config directly instead', E_USER_DEPRECATED);
 
-        $config = $this->config->getConfig();
-        return isset($config['commands']['customCommands']) && is_array($config['commands']['customCommands']);
+        return 0 < count($this->config->getConfig(array('commands', 'customCommands')));
     }
 
     /**
@@ -319,6 +355,7 @@ class Application extends BaseApplication
         trigger_error(__METHOD__ . ' moved, use config directly instead', E_USER_DEPRECATED);
 
         $config = $this->config->getConfig();
+
         return in_array($class, $config['commands']['disabled']);
     }
 
@@ -451,7 +488,7 @@ class Application extends BaseApplication
 
     public function getLongVersion()
     {
-        return parent::getLongVersion() . ' by <info>netz98 new media GmbH</info>';
+        return parent::getLongVersion() . ' by <info>netz98 GmbH</info>';
     }
 
     /**
@@ -632,19 +669,14 @@ class Application extends BaseApplication
         $this->dispatcher = new EventDispatcher();
         $this->setDispatcher($this->dispatcher);
 
-        if (null === $input) {
-            $input = new ArgvInput();
-        }
-
-        if (null === $output) {
-            $output = new ConsoleOutput();
-        }
+        $input = $input ?: new ArgvInput();
+        $output = $output ?: new ConsoleOutput();
 
         if (null !== $this->config) {
             throw new UnexpectedValueException(sprintf('Config already initialized'));
         }
 
-        $loadExternalConfig = !$this->_checkSkipConfigOption($input);
+        $loadExternalConfig = !$input->hasParameterOption('--skip-config');
 
         $this->config = $config = new Config($initConfig, $this->isPharMode(), $output);
         if ($this->configurationLoaderInjected) {
@@ -697,9 +729,15 @@ class Application extends BaseApplication
     /**
      * @param InputInterface $input
      * @return bool
+     * @deprecated 1.97.27
      */
     protected function _checkSkipConfigOption(InputInterface $input)
     {
+        trigger_error(
+            __METHOD__ . ' removed, use $input->hasParameterOption(\'--skip-config\') instead',
+            E_USER_DEPRECATED
+        );
+
         return $input->hasParameterOption('--skip-config');
     }
 
@@ -734,48 +772,26 @@ class Application extends BaseApplication
     }
 
     /**
-     * use require-once inside a function with it's own variable scope w/o any other variables
-     * and $this unbound.
-     *
-     * @param string $path
-     */
-    private function requireOnce($path)
-    {
-        $requireOnce = function () {
-            require_once func_get_arg(0);
-        };
-        if (50400 <= PHP_VERSION_ID) {
-            $requireOnce->bindTo(null);
-        }
-
-        $requireOnce($path);
-    }
-
-    /**
      * @param bool $soft
      *
      * @return void
      */
     protected function _initMagento1($soft = false)
     {
-        if (!class_exists('Mage', false)) {
-            // Create a new AutoloadRestorer to capture currenjt auto-öpaders
-            $restorer = new AutoloadRestorer();
-            // require app/Mage.php from Magento in a function of it's own to have it's own variable scope
-            $this->requireOnce($this->_magentoRootFolder . '/app/Mage.php');
-            // Restore auto-loaders that might be removed by extensions that overwrite Varien/Autoload
-            $restorer->restore();
-        }
+        // Load Mage class definition
+        Initialiser::bootstrap($this->_magentoRootFolder);
 
         // skip Mage::app init routine and return
         if ($soft === true) {
             return;
         }
 
-        $config = $this->config->getConfig();
-        $initSettings = $config['init'];
+        $initSettings = $this->config->getConfig('init');
 
         Mage::app($initSettings['code'], $initSettings['type'], $initSettings['options']);
+        if ($this->_magerunUseDeveloperMode) {
+            Mage::setIsDeveloperMode(true);
+        }
     }
 
     /**

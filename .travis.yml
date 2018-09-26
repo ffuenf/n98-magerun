@@ -1,15 +1,17 @@
 language: php
 sudo: false
+dist: precise
 
 branches:
   only:
     - master
     - develop
-    - /^(bugfix|feature)\/.*$/
-    - interop
+    - /^(bugfix|feature|release)\/.*$/
+
+services:
+  - mysql
 
 php:
-  - 5.3
   - 5.4
   - 5.5
 
@@ -17,6 +19,9 @@ env:
   global:
     - DB=mysql
   matrix:
+    - SCRIPT_JOB="PHP-CS-FIXER"
+    - SCRIPT_JOB="BUILDSH"
+    - SCRIPT_JOB="BASH-AUTOCOMPLETION"
     - MAGENTO_VERSION="magento-mirror-1.4.2.0" INSTALL_SAMPLE_DATA=yes
     - MAGENTO_VERSION="magento-mirror-1.5.1.0" INSTALL_SAMPLE_DATA=yes
     - MAGENTO_VERSION="magento-mirror-1.6.2.0" INSTALL_SAMPLE_DATA=yes
@@ -29,23 +34,17 @@ env:
     - MAGENTO_VERSION="magento-mirror-1.9.2.2" INSTALL_SAMPLE_DATA=no
     - MAGENTO_VERSION="magento-mirror-1.9.2.3" INSTALL_SAMPLE_DATA=no
     - MAGENTO_VERSION="magento-mirror-1.9.2.4" INSTALL_SAMPLE_DATA=no
+    - MAGENTO_VERSION="magento-mirror-1.9.3.0" INSTALL_SAMPLE_DATA=no
+    - MAGENTO_VERSION="magento-mirror-1.9.3.1" INSTALL_SAMPLE_DATA=no
+    - MAGENTO_VERSION="magento-mirror-1.9.3.2" INSTALL_SAMPLE_DATA=no
+    - MAGENTO_VERSION="magento-mirror-1.9.3.4" INSTALL_SAMPLE_DATA=no
+    - MAGENTO_VERSION="magento-mirror-1.9.3.6" INSTALL_SAMPLE_DATA=no
+    - MAGENTO_VERSION="magento-mirror-1.9.3.7" INSTALL_SAMPLE_DATA=no
+    - MAGENTO_VERSION="magento-mirror-1.9.3.8" INSTALL_SAMPLE_DATA=no
 
 matrix:
   fast_finish: true
   exclude:
-    # Newer Magento versions uses newer PHP versions
-    - php: 5.3
-      env: MAGENTO_VERSION="magento-mirror-1.9.0.1" DB=mysql INSTALL_SAMPLE_DATA=no
-    - php: 5.3
-      env: MAGENTO_VERSION="magento-mirror-1.9.1.1" DB=mysql INSTALL_SAMPLE_DATA=no
-    - php: 5.3
-      env: MAGENTO_VERSION="magento-mirror-1.9.2.1" DB=mysql INSTALL_SAMPLE_DATA=no
-    - php: 5.3
-      env: MAGENTO_VERSION="magento-mirror-1.9.2.2" DB=mysql INSTALL_SAMPLE_DATA=no
-    - php: 5.3
-      env: MAGENTO_VERSION="magento-mirror-1.9.2.3" DB=mysql INSTALL_SAMPLE_DATA=no
-    - php: 5.3
-      env: MAGENTO_VERSION="magento-mirror-1.9.2.4" DB=mysql INSTALL_SAMPLE_DATA=no
     # Old Magento Versions are not officially supported to run with PHP 5.5
     - php: 5.5
       env: MAGENTO_VERSION="magento-mirror-1.4.2.0" DB=mysql INSTALL_SAMPLE_DATA=yes
@@ -56,41 +55,90 @@ matrix:
     - php: 5.5
       env: MAGENTO_VERSION="magento-mirror-1.7.0.2" DB=mysql INSTALL_SAMPLE_DATA=no
   include:
-    # Lint PHP code with PHP 7.0
+    # Lint PHP code with future PHP versions (forward compatibility)
     - php: 7.0
-      env: LINTSH=1
-      script: find {src,tests} -name "*.php" ! -path '*/String.php' -print0 | xargs -0 -n1 -P8 php -l | grep -v '^No syntax errors detected'; test $? -eq 1
-    # Run the build script with different PHP versions
-    - php: 5.3
-      env: BUILDSH=1
-      script: build/travis/build.sh
-    - php: 5.4
-      env: BUILDSH=1
-      script: build/travis/build.sh
-    - php: 5.5
-      env: BUILDSH=1
-      script: build/travis/build.sh
+      env: SCRIPT_JOB=LINTSH
+      script: find {src,tests} -name "*.php" ! -path '*/String.php' -print0 | xargs
+        -0 -n1 -P8 php -l | grep -v '^No syntax errors detected'; test $? -eq 1
+    - php: 7.1
+      env: SCRIPT_JOB=LINTSH
+      script: find {src,tests} -name "*.php" ! -path '*/String.php' -print0 | xargs
+        -0 -n1 -P8 php -l | grep -v '^No syntax errors detected'; test $? -eq 1
+    # Run the cs-fixer and build script with different PHP versions
     - php: 5.6
-      env: BUILDSH=1
-      script: build/travis/build.sh
+      env: SCRIPT_JOB="PHP-CS-FIXER"
+    - php: 5.6
+      env: SCRIPT_JOB="BUILDSH"
+    - php: 5.6
+      env: SCRIPT_JOB="BASH-AUTOCOMPLETION"
     - php: 7.0
-      env: BUILDSH=1
-      script: build/travis/build.sh
-    # Run with current PHP 5.6 and PHP 7.0 version
+      env: SCRIPT_JOB="PHP-CS-FIXER"
+    - php: 7.0
+      env: SCRIPT_JOB="BUILDSH"
+    - php: 7.0
+      env: SCRIPT_JOB="BASH-AUTOCOMPLETION"
+    - php: 7.1
+      env: SCRIPT_JOB="PHP-CS-FIXER"
+    - php: 7.1
+      env: SCRIPT_JOB="BUILDSH"
+    - php: 7.1
+      env: SCRIPT_JOB="BASH-AUTOCOMPLETION"
+    # Run with current PHP 5.6 and PHP 7.0 version (as not set in matrix)
     - php: 5.6
       env: MAGENTO_VERSION="magento-mirror-1.9.2.4" DB=mysql INSTALL_SAMPLE_DATA=no
+    - php: 5.6
+      env: MAGENTO_VERSION="magento-mirror-1.9.3.0" DB=mysql INSTALL_SAMPLE_DATA=no
+    - php: 5.6
+      env: MAGENTO_VERSION="magento-mirror-1.9.3.1" DB=mysql INSTALL_SAMPLE_DATA=no
+    - php: 5.6
+      env: MAGENTO_VERSION="magento-mirror-1.9.3.2" DB=mysql INSTALL_SAMPLE_DATA=no
+    - php: 5.6
+      env: MAGENTO_VERSION="magento-mirror-1.9.3.4" DB=mysql INSTALL_SAMPLE_DATA=no
+    - php: 5.6
+      env: MAGENTO_VERSION="magento-mirror-1.9.3.6" DB=mysql INSTALL_SAMPLE_DATA=no
+    - php: 5.6
+      env: MAGENTO_VERSION="magento-mirror-1.9.3.7" DB=mysql INSTALL_SAMPLE_DATA=no
+    - php: 5.6
+      env: MAGENTO_VERSION="magento-mirror-1.9.3.8" DB=mysql INSTALL_SAMPLE_DATA=no
     - php: 7.0
       env: MAGENTO_VERSION="magento-mirror-1.9.2.4" DB=mysql INSTALL_SAMPLE_DATA=no
+    - php: 7.0
+      env: MAGENTO_VERSION="magento-mirror-1.9.3.0" DB=mysql INSTALL_SAMPLE_DATA=no
+    - php: 7.0
+      env: MAGENTO_VERSION="magento-mirror-1.9.3.1" DB=mysql INSTALL_SAMPLE_DATA=no
+    - php: 7.0
+      env: MAGENTO_VERSION="magento-mirror-1.9.3.2" DB=mysql INSTALL_SAMPLE_DATA=no
+    - php: 7.0
+      env: MAGENTO_VERSION="magento-mirror-1.9.3.4" DB=mysql INSTALL_SAMPLE_DATA=no
+    - php: 7.0
+      env: MAGENTO_VERSION="magento-mirror-1.9.3.6" DB=mysql INSTALL_SAMPLE_DATA=no
+    - php: 7.0
+      env: MAGENTO_VERSION="magento-mirror-1.9.3.7" DB=mysql INSTALL_SAMPLE_DATA=no
+    - php: 7.0
+      env: MAGENTO_VERSION="magento-mirror-1.9.3.8" DB=mysql INSTALL_SAMPLE_DATA=no
+    - php: 7.1
+      env: MAGENTO_VERSION="magento-mirror-1.9.3.1" DB=mysql INSTALL_SAMPLE_DATA=no
+    - php: 7.1
+      env: MAGENTO_VERSION="magento-mirror-1.9.3.2" DB=mysql INSTALL_SAMPLE_DATA=no
+    - php: 7.1
+      env: MAGENTO_VERSION="magento-mirror-1.9.3.4" DB=mysql INSTALL_SAMPLE_DATA=no
+    - php: 7.1
+      env: MAGENTO_VERSION="magento-mirror-1.9.3.6" DB=mysql INSTALL_SAMPLE_DATA=no
+    - php: 7.1
+      env: MAGENTO_VERSION="magento-mirror-1.9.3.7" DB=mysql INSTALL_SAMPLE_DATA=no
+    - php: 7.1
+      env: MAGENTO_VERSION="magento-mirror-1.9.3.8" DB=mysql INSTALL_SAMPLE_DATA=no
 
 before_install:
   - phpenv config-rm xdebug.ini
   - travis_retry composer self-update
+  - travis_retry composer global require hirak/prestissimo
 
 install:
-  - travis_retry composer install --prefer-source --no-interaction --ignore-platform-reqs
+  - travis_retry composer install --prefer-dist --no-interaction --ignore-platform-reqs
 
 before_script:
   - source build/travis/before_script.sh
 
 script:
-  - vendor/bin/phpunit --debug --stop-on-error --stop-on-failure
+  - build/travis/script.sh

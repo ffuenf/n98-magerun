@@ -4,6 +4,7 @@
  *
  * @author Tom Klingenberg <https://github.com/ktomk>
  */
+
 namespace N98\Util\Console;
 
 use N98\Util\OperatingSystem;
@@ -15,7 +16,7 @@ use Symfony\Component\Console\Command\Command;
  *
  * Utility class to check console command requirements to be "enabled".
  *
- * @see N98\Magento\Command\Database\DumpCommand::execute()
+ * @see \N98\Magento\Command\Database\DumpCommand::execute()
  *
  * @package N98\Util\Console
  */
@@ -31,11 +32,19 @@ class Enabler
         $this->command = $command;
     }
 
+    /**
+     * @param $name
+     *
+     * @return void
+     */
     public function functionExists($name)
     {
         $this->assert(function_exists($name), sprintf('function "%s" is not available', $name));
     }
 
+    /**
+     * @return void
+     */
     public function operatingSystemIsNotWindows()
     {
         $this->assert(!OperatingSystem::isWindows(), "operating system is windows");

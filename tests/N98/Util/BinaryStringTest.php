@@ -2,7 +2,12 @@
 
 namespace N98\Util;
 
-class StringTest extends \PHPUnit_Framework_TestCase
+/**
+ * Class BinaryStringTest
+ *
+ * @covers \N98\Util\BinaryString
+ */
+class BinaryStringTest extends \PHPUnit_Framework_TestCase
 {
     /**
      * @test
@@ -19,23 +24,23 @@ class StringTest extends \PHPUnit_Framework_TestCase
     /**
      * @return array
      */
-    public static function trimExplodeEmptyProvider()
+    public function trimExplodeEmptyProvider()
     {
         return array(
             array(
                 ',',
                 'Foo,Bar',
-                array('Foo', 'Bar')
+                array('Foo', 'Bar'),
             ),
             array(
                 '#',
                 ' Foo# Bar',
-                array('Foo', 'Bar')
+                array('Foo', 'Bar'),
             ),
             array(
                 ',',
                 ',,Foo, Bar,,',
-                array('Foo', 'Bar')
+                array('Foo', 'Bar'),
             ),
         );
     }
